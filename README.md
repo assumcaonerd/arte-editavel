@@ -1,105 +1,89 @@
 # Arte Editável
 
-Protótipo funcional de aplicativo web para **reconstrução e edição de artes gráficas** a partir de imagens achatadas (PNG, JPG, WEBP).
+Protótipo de aplicativo web para reconstrução e edição de artes gráficas a partir de imagens (PNG, JPG, WEBP).
 
-O objetivo é transformar uma imagem pronta (flyer, post, banner, etc.) em um projeto editável com camadas independentes, textos reais, fotografias e formas — no espírito do Canva, Adobe Express e Figma.
+O objetivo é transformar uma arte pronta em um projeto editável com camadas independentes, textos reais e comandos em português.
 
-## Como usar
+## Como rodar localmente (sem OCR real)
 
-1. Abra o arquivo `index.html` em um navegador moderno (Chrome, Edge, Firefox).
-2. Clique em **Enviar arte**.
-3. Selecione uma imagem.
-4. Clique em **Transformar em arte editável**.
-5. Revise os elementos detectados e abra no editor.
-6. Edite, mova, troque textos, adicione fotos, mude fundo, use comandos em português.
-7. Exporte em PNG, JPG, WEBP, SVG, JSON ou camadas separadas.
+1. Abra a pasta no terminal
+2. Rode um servidor estático:
+   ```bash
+   npx serve .
+   # ou
+   python -m http.server 8080
+   ```
+3. Acesse o endereço que aparecer
 
-Também funciona servindo a pasta com qualquer servidor estático simples:
+Neste modo o app usa análise **simulada** (funciona para testar o editor).
+
+## Como ativar o OCR real (Gemini) de forma segura
+
+A chave da API **nunca** fica no frontend nem no GitHub.
+
+### Opção recomendada: Vercel (mais prática)
+
+1. Crie uma conta gratuita em [vercel.com](https://vercel.com)
+2. Importe este repositório
+3. Em **Settings → Environment Variables**, adicione:
+   ```
+   GEMINI_API_KEY = sua_chave_do_google_ai_studio
+   ```
+4. Faça o deploy
+
+O arquivo `api/analyze.js` já está pronto. Ele recebe a imagem, chama o Gemini e devolve o JSON estruturado. A chave fica só no servidor da Vercel.
+
+### Como conseguir a chave do Gemini
+
+1. Acesse [aistudio.google.com](https://aistudio.google.com)
+2. Crie uma API Key
+3. Cole ela apenas na variável de ambiente da Vercel (nunca no código)
+
+### Testando localmente com a chave
+
+Você pode usar o Vercel CLI:
 
 ```bash
-npx serve .
-# ou
-python -m http.server 8080
+npm i -g vercel
+vercel dev
 ```
 
-## O que o protótipo já faz
+Ele sobe o frontend + a função `/api/analyze` localmente e carrega a variável de ambiente.
 
-- Upload de PNG / JPG / JPEG / WEBP
-- Fluxo completo de análise com indicador de progresso
-- Lista de elementos detectados com grau de confiança (alta / média / baixa)
-- Editor visual com **Fabric.js** (camadas reais, arrastar, redimensionar, rotacionar, etc.)
-- Textos verdadeiros e editáveis (não rastreados na foto)
-- Painel de camadas
-- Painel de propriedades (fonte, tamanho, cor, opacidade, posição, rotação…)
-- Comandos em linguagem natural em português
-- Desfazer / Refazer
-- Salvamento local + exportação JSON do projeto
-- Exportação PNG / JPG / WEBP (alta resolução)
-- Exportação SVG
-- Exportação de cada camada em PNG transparente (ZIP)
-- Comparação “antes e depois” com slider
-- Formatos de prancheta: original, quadrado, story, paisagem, retrato, A4 e personalizado
-- Interface em português do Brasil, escura e limpa
-
-## Comandos de linguagem natural (exemplos)
-
-- `Mude o título para Capitão Assumção`
-- `Deixe o fundo azul-escuro`
-- `Centralize os textos`
-- `Transforme em story`
-- `Transforme em formato quadrado`
-- `Remova o logotipo`
-- `Use uma fonte mais forte e moderna`
-- `Acrescente um texto`
-
-## Limitação importante (e honesta)
-
-Uma imagem JPG ou PNG é **achatada**. Ela não contém as camadas originais, os textos editáveis nem as fotografias separadas.
-
-Qualquer ferramenta que prometa “desconstruir” uma arte precisa:
-
-1. Estimar onde estão os elementos (visão computacional + OCR)
-2. Reconstruir o fundo atrás de textos e objetos (inpainting)
-3. Recriar os textos como tipografia real
-4. Indicar o grau de confiança de cada detecção
-
-Neste protótipo a etapa de análise é **simulada de forma realista** (com progresso, lista de elementos e confiança). A estrutura do código já está preparada para receber o resultado de um modelo de visão real.
-
-### Como plugar uma IA de verdade
-
-Substitua a função `startAnalysis()` em `app.js` por uma chamada a:
-
-- **GPT-4o / Claude 3.5 / Gemini** (visão multimodal) pedindo bounding boxes + OCR + classificação
-- **Google Cloud Vision** + **Document AI** para OCR de alta qualidade
-- **Segment Anything (SAM)** ou modelos de segmentação para máscaras de pessoas/objetos
-- **Inpainting** (Stable Diffusion, Adobe Firefly, etc.) para reconstruir o fundo
-
-O formato esperado de resposta já está modelado no array `state.detectedElements`.
-
-## Estrutura dos arquivos
+## Estrutura do projeto
 
 ```
 arte-editavel/
-├── index.html      # Interface completa
-├── app.js          # Lógica do editor, análise, exportação e comandos
-└── README.md       # Este arquivo
+├── index.html          # Interface
+├── app.js              # Editor (Fabric.js)
+├── ocrService.js       # Abstração do OCR (chama o endpoint seguro)
+├── api/
+│   └── analyze.js      # Função serverless (Vercel) - aqui fica a chamada ao Gemini
+└── README.md
 ```
 
-## Próximos passos recomendados
+## Fluxo de análise
 
-1. Integrar um modelo de visão real (a parte mais importante para fidelidade).
-2. Melhorar o OCR e a sugestão de fontes parecidas (Google Fonts + matching).
-3. Implementar exportação PPTX de verdade (com pptxgenjs ou similar) para levar fotos + textos editáveis ao PowerPoint/Canva.
-4. Adicionar máscaras, recorte inteligente e remoção de fundo.
-5. Histórico de versões mais robusto e sincronização em nuvem.
+1. Usuário envia a imagem
+2. Frontend chama `/api/analyze` (sem enviar chave)
+3. O servidor usa a chave e consulta o Gemini
+4. Retorna elementos com bounding box, texto, confiança e tipo
+5. O editor cria as camadas editáveis
+6. Usuário revisa e corrige o que precisar
+
+## Próximos passos planejados
+
+- Migrar o motor principal para PaddleOCR-VL (self-hosted) quando o volume crescer
+- Manter Gemini como fallback para casos difíceis
+- Melhorar inpainting do fundo e detecção de fontes
 
 ## Tecnologias
 
-- HTML5 + Tailwind CSS (CDN)
-- Fabric.js 5 (canvas orientado a objetos)
-- JSZip (exportação de camadas)
-- Google Fonts
+- Fabric.js (editor de canvas)
+- Tailwind CSS
+- Gemini 2.0 Flash (OCR via endpoint seguro)
+- Vercel Serverless Functions
 
 ---
 
-Feito para o fluxo de trabalho de produção de conteúdo político e gráfico.
+Feito para produção de conteúdo político e gráfico.
