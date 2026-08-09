@@ -1,6 +1,6 @@
 /**
  * Arte Editavel - Editor estilo Canva
- * Textos detectados viram camadas IText no canvas Fabric
+ * Integra LayerService (fundo limpo + textos IText)
  */
 (function () {
   'use strict';
@@ -9,7 +9,9 @@
     canvas: null,
     originalImage: null,
     originalImageDataUrl: null,
+    cleanBackgroundUrl: null,
     detectedElements: [],
+    reconstruction: null,
     history: [],
     historyIndex: -1
   };
@@ -31,7 +33,6 @@
   function initCanvas() {
     var el = document.getElementById('main-canvas');
     if (!el || typeof fabric === 'undefined') return;
-
     state.canvas = new fabric.Canvas('main-canvas', {
       backgroundColor: '#111827',
       preserveObjectStacking: true,
@@ -40,7 +41,6 @@
     });
     state.canvas.setWidth(800);
     state.canvas.setHeight(600);
-
     fabric.Object.prototype.set({
       transparentCorners: false,
       borderColor: '#3b82f6',
@@ -50,14 +50,10 @@
       padding: 4,
       borderScaleFactor: 1.5
     });
-
     state.canvas.on('selection:created', onSelect);
     state.canvas.on('selection:updated', onSelect);
     state.canvas.on('selection:cleared', onDeselect);
-    state.canvas.on('object:modified', function () {
-      saveHistory();
-      updateLayersPanel();
-    });
+    state.canvas.on('object:modified', function () { saveHistory(); updateLayersPanel(); });
   }
 
   function onSelect(e) {
@@ -68,23 +64,16 @@
   }
 
   function onDeselect() {
-    var empty = $('#props-empty');
-    var content = $('#props-content');
-    if (empty) empty.classList.remove('hidden');
-    if (content) content.classList.add('hidden');
+    if ($('#props-empty')) $('#props-empty').classList.remove('hidden');
+    if ($('#props-content')) $('#props-content').classList.add('hidden');
     updateLayersPanel();
   }
 
   function showProps(obj) {
-    var empty = $('#props-empty');
-    var content = $('#props-content');
-    if (empty) empty.classList.add('hidden');
-    if (content) content.classList.remove('hidden');
-
+    if ($('#props-empty')) $('#props-empty').classList.add('hidden');
+    if ($('#props-content')) $('#props-content').classList.remove('hidden');
     var isText = obj.type === 'i-text' || obj.type === 'text' || obj.type === 'textbox';
-    var textBlock = $('#props-text');
-    if (textBlock) textBlock.style.display = isText ? 'block' : 'none';
-
+    if ($('#props-text')) $('#props-text').style.display = isText ? 'block' : 'none';
     if (isText) {
       if ($('#prop-text-content')) $('#prop-text-content').value = obj.text || '';
       if ($('#prop-font-size')) $('#prop-font-size').value = Math.round(obj.fontSize || 24);
@@ -109,8 +98,7 @@
     if (state.historyIndex <= 0 || !state.canvas) return;
     state.historyIndex--;
     state.canvas.loadFromJSON(state.history[state.historyIndex], function () {
-      state.canvas.renderAll();
-      updateLayersPanel();
+      state.canvas.renderAll(); updateLayersPanel();
     });
   }
 
@@ -118,8 +106,7 @@
     if (state.historyIndex >= state.history.length - 1 || !state.canvas) return;
     state.historyIndex++;
     state.canvas.loadFromJSON(state.history[state.historyIndex], function () {
-      state.canvas.renderAll();
-      updateLayersPanel();
+      state.canvas.renderAll(); updateLayersPanel();
     });
   }
 
@@ -171,6 +158,7 @@
     var reader = new FileReader();
     reader.onload = function (e) {
       state.originalImageDataUrl = e.target.result;
+      state.cleanBackgroundUrl = null;
       var img = new Image();
       img.onload = function () {
         state.originalImage = img;
@@ -192,13 +180,35 @@
     if ($('#upload-step-2')) $('#upload-step-2').classList.remove('hidden');
     if ($('#upload-step-3')) $('#upload-step-3').classList.add('hidden');
 
-    if ($('#analysis-status')) $('#analysis-status').textContent = 'Analisando a arte...';
-    if ($('#analysis-detail')) $('#analysis-detail').textContent = 'Detectando textos';
-    if ($('#analysis-progress')) $('#analysis-progress').style.width = '30%';
+    if ($('#analysis-status')) $('#analysis-status').textContent = 'Reconstruindo camadas...';
+    if ($('#analysis-detail')) $('#analysis-detail').textContent = 'OCR + fundo limpo';
+    if ($('#analysis-progress')) $('#analysis-progress').style.width = '25%';
 
     var result;
     try {
-      if (window.OCRService) {
+      if (window.LayerService) {
+        if ($('#analysis-progress')) $('#analysis-progress').style.width = '50%';
+        var recon = await window.LayerService.reconstruct(state.originalImageDataUrl);
+        state.reconstruction = recon;
+        if (recon.backgroundUrl) state.cleanBackgroundUrl = recon.backgroundUrl;
+        result = {
+          elements: (recon.texts || []).map(function (t, i) {
+            return {
+              id: 'text-' + (i + 1),
+              type: 'text',
+              label: t.label || ('Texto ' + (i + 1)),
+              text: t.text,
+              bbox: { x: t.x, y: t.y, w: t.w, h: t.h },
+              color: t.color,
+              fontGuess: t.fontFamily,
+              confidence: 'high'
+            };
+          }),
+          provider: recon.provider,
+          simulated: recon.simulated,
+          backgroundUrl: recon.backgroundUrl
+        };
+      } else if (window.OCRService) {
         result = await window.OCRService.analyzeImage(state.originalImageDataUrl);
       } else {
         result = { elements: [], simulated: true };
@@ -213,11 +223,12 @@
 
     if ($('#analysis-status')) {
       $('#analysis-status').textContent = result.simulated
-        ? 'Modo simulado - configure a chave em Config'
-        : 'Analise real (' + (result.provider || 'IA') + ')';
+        ? 'Modo simulado - configure chave em Config'
+        : 'Reconstrucao (' + (result.provider || 'IA') + ')';
     }
     if ($('#analysis-detail')) {
-      $('#analysis-detail').textContent = state.detectedElements.length + ' elementos';
+      $('#analysis-detail').textContent = state.detectedElements.length + ' textos' +
+        (state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl ? ' + fundo limpo' : '');
     }
 
     var box = $('#detected-elements');
@@ -261,12 +272,15 @@
     state.history = [];
     state.historyIndex = -1;
 
-    fabric.Image.fromURL(state.originalImageDataUrl, function (fabricImg) {
+    var bgUrl = state.cleanBackgroundUrl || state.originalImageDataUrl;
+
+    fabric.Image.fromURL(bgUrl, function (fabricImg) {
       fabricImg.set({
         left: 0, top: 0,
         scaleX: scale, scaleY: scale,
         selectable: true,
-        name: 'Imagem (fundo)',
+        name: state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl
+          ? 'Fundo limpo' : 'Imagem (fundo)',
         layerType: 'background'
       });
       state.canvas.add(fabricImg);
@@ -297,31 +311,14 @@
         state.canvas.add(text);
       });
 
-      elements.filter(function (e) { return e.type === 'photo'; }).forEach(function (el) {
-        var bbox = el.bbox || { x: 0.05, y: 0.15, w: 0.9, h: 0.5 };
-        var rect = new fabric.Rect({
-          left: bbox.x * displayW,
-          top: bbox.y * displayH,
-          width: bbox.w * displayW,
-          height: bbox.h * displayH,
-          fill: 'transparent',
-          stroke: '#3b82f6',
-          strokeWidth: 1.5,
-          strokeDashArray: [6, 4],
-          name: 'Area da foto',
-          layerType: 'photo',
-          opacity: 0.7
-        });
-        state.canvas.add(rect);
-      });
-
       state.canvas.requestRenderAll();
       updateLayersPanel();
       saveHistory();
 
       var n = textEls.length;
-      toast(n ? n + ' textos no canvas. Clique para editar.' : 'Arte carregada. Use + Texto.');
-    });
+      var clean = state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl;
+      toast(n + ' textos editaveis' + (clean ? ' sobre fundo limpo' : '') + '. Clique para editar.');
+    }, { crossOrigin: 'anonymous' });
   }
 
   function addText() {
@@ -485,6 +482,6 @@
   document.addEventListener('DOMContentLoaded', function () {
     initCanvas();
     bindEvents();
-    console.log('Arte Editavel - modo Canva pronto');
+    console.log('Arte Editavel + LayerService pronto');
   });
 })();
