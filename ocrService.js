@@ -53,6 +53,9 @@ async function analyzeImage(imageDataUrl) {
     if (provider === 'gemini') {
       return await callGemini(base64Data, mimeType, apiKey);
     }
+    if (provider === 'groq') {
+      return await callGroq(base64Data, mimeType, apiKey);
+    }
     if (provider === 'openai') {
       return await callOpenAI(base64Data, mimeType, apiKey);
     }
@@ -152,6 +155,49 @@ async function callGemini(base64Data, mimeType, apiKey) {
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   return parseModelResponse(text, 'gemini');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Groq                                                              */
+/* ------------------------------------------------------------------ */
+
+async function callGroq(base64Data, mimeType, apiKey) {
+  // Groq usa API compatível com OpenAI + modelos com visão (Llama 4 Scout / Llama 3.2 Vision)
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: ANALYSIS_PROMPT },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 4096,
+      temperature: 0.1
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq: ${response.status} – ${errText.slice(0, 200)}`);
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  return parseModelResponse(text, 'groq');
 }
 
 /* ------------------------------------------------------------------ */
