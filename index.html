@@ -1,399 +1,318 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Arte Editável – Reconstrução de Artes Gráficas</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arte Editável</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400;700&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg-main: #0f1115;
-      --bg-panel: #1a1d24;
-      --bg-hover: #252a34;
-      --border: #2d3340;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --text: #e5e7eb;
-      --text-muted: #9ca3af;
-    }
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg-main);
-      color: var(--text);
-      overflow: hidden;
-    }
-    .panel {
-      background: var(--bg-panel);
-      border-color: var(--border);
-    }
-    .btn {
-      transition: all 0.15s ease;
-    }
+    :root { --panel: #111827; --border: #1f2937; }
+    body { background: #0b0f19; color: #e5e7eb; font-family: Inter, system-ui, sans-serif; }
+    .panel { background: var(--panel); border-color: var(--border); }
+    .btn { transition: all 0.15s; }
     .btn:hover { filter: brightness(1.1); }
-    .btn:active { transform: scale(0.97); }
-    .layer-item {
-      cursor: pointer;
-      transition: background 0.12s;
-    }
-    .layer-item:hover, .layer-item.active {
-      background: var(--bg-hover);
-    }
-    .layer-item.active {
-      border-left: 3px solid var(--accent);
-    }
-    #canvas-container {
-      background: #111;
-      background-image: 
-        linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
-        linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
-        linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
-      background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-    }
-    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { background: #3f4654; border-radius: 3px; }
-    .tool-btn.active {
-      background: var(--accent);
-      color: white;
-    }
-    #compare-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      height: 4px;
-      background: #3f4654;
-      border-radius: 2px;
-      outline: none;
-    }
-    #compare-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      background: var(--accent);
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    .confidence-high { color: #22c55e; }
-    .confidence-medium { color: #eab308; }
-    .confidence-low { color: #ef4444; }
-    .modal-backdrop {
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-    }
+    .tool-btn.active { background: #1d4ed8; color: white; }
+    .layer-item.active { background: #1e3a5f; }
+    .confidence-high { color: #34d399; }
+    .confidence-medium { color: #fbbf24; }
+    .confidence-low { color: #f87171; }
+    .modal-backdrop { background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); }
+    #toast { transition: opacity 0.3s; }
+    .export-option:hover { background: #1f2937; }
   </style>
 </head>
-<body class="h-screen flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden">
 
-  <!-- TOP BAR -->
+  <!-- Header -->
   <header class="h-12 panel border-b flex items-center px-4 gap-3 shrink-0">
     <div class="flex items-center gap-2 mr-4">
       <div class="w-7 h-7 rounded bg-blue-600 flex items-center justify-center text-sm font-bold">AE</div>
-      <span class="font-semibold text-sm tracking-tight">Arte Editável</span>
+      <span class="font-semibold text-sm hidden sm:inline">Arte Editável</span>
     </div>
-    
-    <input id="project-name" type="text" value="Projeto sem nome" 
-           class="bg-transparent border border-transparent hover:border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-sm w-48 outline-none" />
-    
+
     <div class="flex items-center gap-1 ml-2">
-      <button id="btn-undo" class="btn p-1.5 rounded hover:bg-gray-700 text-gray-400" title="Desfazer (Ctrl+Z)">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
-      </button>
-      <button id="btn-redo" class="btn p-1.5 rounded hover:bg-gray-700 text-gray-400" title="Refazer (Ctrl+Y)">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"/></svg>
-      </button>
+      <button id="btn-undo" class="btn px-2 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600" title="Desfazer">↩</button>
+      <button id="btn-redo" class="btn px-2 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600" title="Refazer">↪</button>
     </div>
+
+    <select id="format-select" class="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs ml-3 focus:outline-none">
+      <option value="original">Original</option>
+      <option value="1080x1080">Quadrado 1080</option>
+      <option value="1080x1920">Story 1080x1920</option>
+      <option value="1920x1080">Paisagem 1920x1080</option>
+      <option value="1080x1350">Retrato 4:5</option>
+      <option value="a4">A4</option>
+      <option value="custom">Personalizado</option>
+    </select>
+
+    <button id="btn-settings" class="btn px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600 flex items-center gap-1.5" title="Configurações de OCR">
+      <span>⚙</span> Config
+    </button>
+    <button id="btn-compare" class="btn px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600 flex items-center gap-1.5">
+      <span>⇄</span> Comparar
+    </button>
 
     <div class="flex-1"></div>
 
-    <button id="btn-compare" class="btn px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600 flex items-center gap-1.5">
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-      Comparar
-    </button>
-    
+    <input id="project-name" type="text" value="Projeto sem nome" class="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs w-40 focus:outline-none focus:border-blue-500">
     <button id="btn-save" class="btn px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600">Salvar</button>
-    
     <div class="relative">
-      <button id="btn-export" class="btn px-3 py-1.5 rounded text-xs bg-blue-600 hover:bg-blue-500 font-medium">Exportar</button>
-      <div id="export-menu" class="hidden absolute right-0 top-full mt-1 w-48 panel border rounded-lg shadow-xl z-50 py-1">
-        <button data-format="png" class="export-option w-full text-left px-3 py-2 text-sm hover:bg-gray-700">PNG</button>
-        <button data-format="jpg" class="export-option w-full text-left px-3 py-2 text-sm hover:bg-gray-700">JPG</button>
-        <button data-format="webp" class="export-option w-full text-left px-3 py-2 text-sm hover:bg-gray-700">WEBP</button>
-        <button data-format="svg" class="export-option w-full text-left px-3 py-2 text-sm hover:bg-gray-700">SVG</button>
-        <button data-format="json" class="export-option w-full text-left px-3 py-2 text-sm hover:bg-gray-700">Projeto JSON</button>
-        <button data-format="png-layers" class="export-option w-full text-left px-3 py-2 text-sm hover:bg-gray-700">Camadas PNG</button>
-        <div class="border-t border-gray-700 my-1"></div>
-        <button data-format="pptx" class="export-option w-full text-left px-3 py-2 text-sm hover:bg-gray-700 text-yellow-400">PPTX (experimental)</button>
+      <button id="btn-export" class="btn px-3 py-1.5 rounded text-xs bg-emerald-600 hover:bg-emerald-500">Exportar ▾</button>
+      <div id="export-menu" class="hidden absolute right-0 top-full mt-1 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20 py-1">
+        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="png">PNG (alta resolução)</button>
+        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="jpg">JPG</button>
+        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="webp">WEBP</button>
+        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="svg">SVG</button>
+        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="png-layers">Camadas em ZIP</button>
+        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="json">Projeto JSON</button>
+        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="pptx">PPTX (experimental)</button>
       </div>
     </div>
   </header>
 
-  <!-- MAIN AREA -->
+  <!-- Main -->
   <div class="flex-1 flex overflow-hidden">
 
-    <!-- LEFT PANEL -->
-    <aside class="w-56 panel border-r flex flex-col shrink-0">
+    <!-- Left sidebar -->
+    <aside class="w-56 panel border-r flex flex-col shrink-0 overflow-y-auto">
       <div class="p-3 border-b border-gray-700">
         <button id="btn-upload" class="w-full btn py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium flex items-center justify-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-          Enviar arte
+          <span>⬆</span> Enviar arte
         </button>
-        <input type="file" id="file-input" accept="image/png,image/jpeg,image/jpg,image/webp" multiple class="hidden" />
       </div>
 
-      <div class="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-1">
-        <p class="text-xs text-gray-500 px-2 pt-2 uppercase tracking-wider">Ferramentas</p>
-        
-        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="select">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
-          Selecionar
+      <div class="p-3 space-y-1">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Ferramentas</p>
+        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2 active" data-tool="select">
+          <span>↖</span> Selecionar
         </button>
         <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="text">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/></svg>
-          Texto
+          <span>T</span> Texto
         </button>
         <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="rect">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z"/></svg>
-          Retângulo
+          <span>□</span> Retângulo
         </button>
         <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="circle">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
-          Círculo
+          <span>○</span> Círculo
         </button>
         <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="image">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          Imagem
+          <span>🖼</span> Imagem
         </button>
-
-        <p class="text-xs text-gray-500 px-2 pt-4 uppercase tracking-wider">Ações rápidas</p>
-        <button id="btn-add-text" class="w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700">+ Adicionar texto</button>
-        <button id="btn-add-image" class="w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700">+ Adicionar foto</button>
-        <button id="btn-bg-color" class="w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700">Alterar fundo</button>
-        <button id="btn-duplicate" class="w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700">Duplicar selecionado</button>
-        <button id="btn-delete" class="w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 text-red-400">Apagar selecionado</button>
       </div>
 
-      <div class="p-3 border-t border-gray-700">
-        <p class="text-xs text-gray-500 mb-1">Formato da arte</p>
-        <select id="format-select" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm outline-none">
-          <option value="original">Original</option>
-          <option value="1080x1080">Quadrado (1080×1080)</option>
-          <option value="1080x1920">Story (1080×1920)</option>
-          <option value="1920x1080">Paisagem (1920×1080)</option>
-          <option value="1080x1350">Retrato (1080×1350)</option>
-          <option value="a4">A4 (2480×3508)</option>
-          <option value="custom">Personalizado...</option>
-        </select>
+      <div class="p-3 space-y-2 border-t border-gray-700">
+        <p class="text-xs text-gray-500 uppercase tracking-wider">Ações rápidas</p>
+        <button id="btn-add-text" class="w-full btn py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600">+ Texto</button>
+        <button id="btn-add-image" class="w-full btn py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600">+ Imagem</button>
+        <button id="btn-bg-color" class="w-full btn py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600">Cor do fundo</button>
+        <button id="btn-duplicate" class="w-full btn py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600">Duplicar</button>
+        <button id="btn-delete" class="w-full btn py-1.5 rounded text-xs bg-red-900/50 hover:bg-red-800/50 text-red-300">Excluir</button>
       </div>
     </aside>
 
-    <!-- CENTER CANVAS -->
-    <main class="flex-1 flex flex-col overflow-hidden relative">
+    <!-- Canvas area -->
+    <main class="flex-1 flex flex-col overflow-hidden">
       <div id="canvas-container" class="flex-1 flex items-center justify-center overflow-auto p-6">
         <canvas id="main-canvas"></canvas>
       </div>
 
-      <!-- Natural language command bar -->
+      <!-- Natural language bar -->
       <div class="h-14 panel border-t flex items-center px-4 gap-3 shrink-0">
-        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-        <input id="nl-command" type="text" placeholder="Digite um comando em português... ex: 'Troque o título para Capitão Assumção' ou 'Deixe o fundo azul-escuro'"
-               class="flex-1 bg-transparent border border-gray-600 focus:border-blue-500 rounded-lg px-3 py-2 text-sm outline-none" />
-        <button id="btn-run-command" class="btn px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium">Executar</button>
+        <span class="text-xs text-gray-500 shrink-0">Comando:</span>
+        <input id="nl-command" type="text" placeholder='Ex: "Mude o título para Novo Título", "Deixe o fundo azul-escuro", "Centralize os textos"'
+               class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+        <button id="btn-run-command" class="btn px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-sm">Executar</button>
       </div>
     </main>
 
-    <!-- RIGHT PANEL -->
-    <aside class="w-64 panel border-l flex flex-col shrink-0">
-      <!-- Layers -->
-      <div class="flex-1 flex flex-col min-h-0">
-        <div class="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
-          <span class="text-xs font-medium uppercase tracking-wider text-gray-400">Camadas</span>
-          <button id="btn-refresh-layers" class="text-xs text-gray-500 hover:text-white">atualizar</button>
-        </div>
-        <div id="layers-list" class="flex-1 overflow-y-auto scrollbar-thin p-1">
-          <!-- layers will be injected here -->
-        </div>
+    <!-- Right sidebar -->
+    <aside class="w-64 panel border-l flex flex-col shrink-0 overflow-hidden">
+      <div class="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
+        <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Camadas</span>
+        <button id="btn-refresh-layers" class="text-xs text-gray-500 hover:text-white">↻</button>
       </div>
+      <div id="layers-list" class="flex-1 overflow-y-auto p-2 space-y-0.5"></div>
 
-      <!-- Properties -->
-      <div class="border-t border-gray-700 p-3 space-y-3 max-h-[45%] overflow-y-auto scrollbar-thin">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Propriedades</p>
-        
-        <div id="props-empty" class="text-sm text-gray-500 py-4 text-center">
-          Selecione um elemento
+      <div class="border-t border-gray-700">
+        <div class="px-3 py-2 border-b border-gray-700">
+          <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Propriedades</span>
         </div>
-
-        <div id="props-content" class="hidden space-y-3">
-          <!-- Text properties -->
-          <div id="props-text" class="hidden space-y-2">
-            <label class="text-xs text-gray-400">Texto</label>
-            <textarea id="prop-text-content" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm outline-none resize-none"></textarea>
-            
-            <label class="text-xs text-gray-400">Fonte</label>
-            <select id="prop-font-family" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm outline-none">
-              <option value="Inter">Inter</option>
-              <option value="Roboto">Roboto</option>
-              <option value="Montserrat">Montserrat</option>
-              <option value="Playfair Display">Playfair Display</option>
-              <option value="Oswald">Oswald</option>
-              <option value="Arial">Arial</option>
-              <option value="Georgia">Georgia</option>
-            </select>
-
+        <div id="props-empty" class="p-4 text-xs text-gray-500 text-center">Selecione um elemento</div>
+        <div id="props-content" class="hidden p-3 space-y-3 text-xs overflow-y-auto max-h-80">
+          <div id="props-text" class="space-y-2">
+            <label class="block text-gray-400">Texto</label>
+            <textarea id="prop-text-content" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none"></textarea>
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="text-xs text-gray-400">Tamanho</label>
-                <input id="prop-font-size" type="number" min="8" max="200" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm outline-none" />
+                <label class="block text-gray-400 mb-1">Fonte</label>
+                <select id="prop-font-family" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1">
+                  <option>Inter</option><option>Montserrat</option><option>Oswald</option>
+                  <option>Roboto</option><option>Arial</option><option>Georgia</option>
+                </select>
               </div>
               <div>
-                <label class="text-xs text-gray-400">Cor</label>
-                <input id="prop-text-color" type="color" class="w-full h-8 bg-gray-800 border border-gray-600 rounded cursor-pointer" />
+                <label class="block text-gray-400 mb-1">Tamanho</label>
+                <input id="prop-font-size" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1">
               </div>
             </div>
-
-            <div class="flex gap-1">
-              <button id="prop-bold" class="flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs font-bold">B</button>
-              <button id="prop-italic" class="flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs italic">I</button>
-              <button id="prop-underline" class="flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs underline">U</button>
+            <div class="flex gap-2 items-center">
+              <label class="text-gray-400">Cor</label>
+              <input id="prop-text-color" type="color" value="#ffffff" class="w-8 h-8 rounded cursor-pointer">
+              <button id="prop-bold" class="btn px-2 py-1 bg-gray-700 rounded font-bold">B</button>
+              <button id="prop-italic" class="btn px-2 py-1 bg-gray-700 rounded italic">I</button>
+              <button id="prop-underline" class="btn px-2 py-1 bg-gray-700 rounded underline">U</button>
             </div>
-
             <div class="flex gap-1">
-              <button data-align="left" class="align-btn flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs">⬅</button>
-              <button data-align="center" class="align-btn flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs">⬤</button>
-              <button data-align="right" class="align-btn flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs">➡</button>
+              <button class="align-btn btn px-2 py-1 bg-gray-700 rounded" data-align="left">⬅</button>
+              <button class="align-btn btn px-2 py-1 bg-gray-700 rounded" data-align="center">↔</button>
+              <button class="align-btn btn px-2 py-1 bg-gray-700 rounded" data-align="right">➡</button>
             </div>
           </div>
 
-          <!-- Common properties -->
-          <div class="space-y-2">
-            <label class="text-xs text-gray-400">Opacidade</label>
-            <input id="prop-opacity" type="range" min="0" max="100" value="100" class="w-full" />
-            
+          <div class="space-y-2 pt-2 border-t border-gray-700">
             <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="text-xs text-gray-400">X</label>
-                <input id="prop-left" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm outline-none" />
-              </div>
-              <div>
-                <label class="text-xs text-gray-400">Y</label>
-                <input id="prop-top" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm outline-none" />
-              </div>
+              <div><label class="text-gray-400">X</label><input id="prop-left" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
+              <div><label class="text-gray-400">Y</label><input id="prop-top" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
+              <div><label class="text-gray-400">Largura</label><input id="prop-width" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
+              <div><label class="text-gray-400">Altura</label><input id="prop-height" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
             </div>
-
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="text-xs text-gray-400">Largura</label>
-                <input id="prop-width" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm outline-none" />
-              </div>
-              <div>
-                <label class="text-xs text-gray-400">Altura</label>
-                <input id="prop-height" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm outline-none" />
-              </div>
+            <div>
+              <label class="text-gray-400">Opacidade</label>
+              <input id="prop-opacity" type="range" min="0" max="100" value="100" class="w-full">
             </div>
-
-            <label class="text-xs text-gray-400">Rotação</label>
-            <input id="prop-angle" type="range" min="0" max="360" value="0" class="w-full" />
-          </div>
-
-          <div class="pt-2 flex gap-2">
-            <button id="prop-lock" class="flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs">Bloquear</button>
-            <button id="prop-hide" class="flex-1 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-xs">Ocultar</button>
+            <div>
+              <label class="text-gray-400">Rotação</label>
+              <input id="prop-angle" type="range" min="0" max="360" value="0" class="w-full">
+            </div>
+            <div class="flex gap-2">
+              <button id="prop-lock" class="btn flex-1 py-1.5 bg-gray-700 rounded">🔒 Bloquear</button>
+              <button id="prop-hide" class="btn flex-1 py-1.5 bg-gray-700 rounded">👁 Ocultar</button>
+            </div>
           </div>
         </div>
       </div>
     </aside>
   </div>
 
-  <!-- MODALS -->
-  <!-- Upload / Analysis Modal -->
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 text-sm px-4 py-2.5 rounded-lg shadow-xl z-50"></div>
+
+  <!-- Modal Upload -->
   <div id="modal-upload" class="fixed inset-0 modal-backdrop z-50 flex items-center justify-center hidden">
-    <div class="panel border rounded-xl w-full max-w-2xl mx-4 overflow-hidden shadow-2xl">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="p-5 border-b border-gray-700 flex items-center justify-between">
-        <h2 class="font-semibold text-lg">Transformar em arte editável</h2>
-        <button id="close-upload-modal" class="text-gray-400 hover:text-white text-xl">&times;</button>
+        <h2 class="text-lg font-semibold">Enviar arte</h2>
+        <button id="close-upload-modal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
       </div>
-      
-      <div id="upload-step-1" class="p-6">
-        <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl p-10 text-center hover:border-blue-500 transition cursor-pointer">
-          <svg class="w-12 h-12 mx-auto text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          <p class="text-gray-300 mb-1">Arraste uma imagem ou clique para selecionar</p>
+
+      <div id="upload-step-1" class="p-5">
+        <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl p-10 text-center cursor-pointer hover:border-blue-500 transition">
+          <p class="text-gray-400 mb-2">Arraste uma imagem ou clique para selecionar</p>
           <p class="text-xs text-gray-500">PNG, JPG, JPEG ou WEBP</p>
+          <input id="file-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" class="hidden">
         </div>
         <div id="preview-container" class="hidden mt-4">
-          <img id="preview-img" class="max-h-64 mx-auto rounded-lg shadow-lg" />
-          <p id="preview-info" class="text-center text-sm text-gray-400 mt-2"></p>
+          <img id="preview-img" class="max-h-48 mx-auto rounded-lg border border-gray-700">
+          <p id="preview-info" class="text-xs text-gray-500 text-center mt-2"></p>
         </div>
-        <div class="mt-6 flex gap-3 justify-end">
-          <button id="btn-cancel-upload" class="px-4 py-2 rounded text-sm bg-gray-700 hover:bg-gray-600">Cancelar</button>
-          <button id="btn-start-analysis" class="px-5 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500 font-medium disabled:opacity-40" disabled>
-            Transformar em arte editável
-          </button>
+        <div class="flex justify-end gap-2 mt-5">
+          <button id="btn-cancel-upload" class="btn px-4 py-2 rounded text-sm bg-gray-700 hover:bg-gray-600">Cancelar</button>
+          <button id="btn-start-analysis" class="btn px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500" disabled>Transformar em arte editável</button>
         </div>
       </div>
 
-      <div id="upload-step-2" class="p-6 hidden">
-        <div class="text-center py-8">
-          <div class="w-16 h-16 mx-auto mb-4 relative">
-            <div class="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
-            <div class="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <p id="analysis-status" class="text-gray-300 mb-1">Analisando a imagem...</p>
-          <p id="analysis-detail" class="text-sm text-gray-500">Identificando elementos, textos e camadas</p>
-          <div class="w-64 mx-auto mt-4 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-            <div id="analysis-progress" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
+      <div id="upload-step-2" class="p-5 hidden">
+        <div class="text-center py-6">
+          <p id="analysis-status" class="text-sm font-medium mb-1">Analisando...</p>
+          <p id="analysis-detail" class="text-xs text-gray-500 mb-4">Preparando</p>
+          <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+            <div id="analysis-progress" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
           </div>
         </div>
       </div>
 
-      <div id="upload-step-3" class="p-6 hidden">
-        <h3 class="font-medium mb-3">Elementos encontrados</h3>
-        <p class="text-sm text-gray-400 mb-4">Revise os elementos detectados. Você poderá ajustar tudo no editor.</p>
-        <div id="detected-elements" class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin mb-4">
-          <!-- injected -->
-        </div>
-        <div class="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-3 text-sm text-yellow-200 mb-4">
-          <strong>Importante:</strong> Imagens achatadas (JPG/PNG) não guardam camadas reais. A reconstrução é uma aproximação inteligente. Elementos com baixa confiança podem precisar de ajuste manual.
-        </div>
-        <div class="flex gap-3 justify-end">
-          <button id="btn-manual-adjust" class="px-4 py-2 rounded text-sm bg-gray-700 hover:bg-gray-600">Ajustar manualmente</button>
-          <button id="btn-go-editor" class="px-5 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500 font-medium">Abrir no editor</button>
+      <div id="upload-step-3" class="p-5 hidden">
+        <p class="text-sm font-medium mb-3">Elementos encontrados</p>
+        <div id="detected-elements" class="space-y-2 max-h-64 overflow-y-auto mb-5"></div>
+        <div class="flex justify-end gap-2">
+          <button id="btn-manual-adjust" class="btn px-4 py-2 rounded text-sm bg-gray-700 hover:bg-gray-600">Ajustar manualmente</button>
+          <button id="btn-go-editor" class="btn px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500">Ir para o editor</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Compare Modal -->
+  <!-- Modal Compare -->
   <div id="modal-compare" class="fixed inset-0 modal-backdrop z-50 flex items-center justify-center hidden">
-    <div class="panel border rounded-xl w-full max-w-4xl mx-4 overflow-hidden shadow-2xl">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-3xl mx-4 shadow-2xl">
       <div class="p-4 border-b border-gray-700 flex items-center justify-between">
-        <h2 class="font-semibold">Comparar original × reconstruída</h2>
-        <button id="close-compare-modal" class="text-gray-400 hover:text-white text-xl">&times;</button>
+        <h2 class="text-lg font-semibold">Comparar original × reconstrução</h2>
+        <button id="close-compare-modal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
       </div>
-      <div class="p-4">
-        <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-          <img id="compare-original" class="absolute inset-0 w-full h-full object-contain" />
-          <div id="compare-recon-wrapper" class="absolute inset-0 overflow-hidden" style="width: 50%">
-            <img id="compare-recon" class="absolute inset-0 w-full h-full object-contain" style="width: 200%; max-width: none;" />
+      <div class="p-4 relative">
+        <div class="relative overflow-hidden rounded-lg border border-gray-700" style="height: 400px;">
+          <img id="compare-original" class="absolute inset-0 w-full h-full object-contain">
+          <div id="compare-recon-wrapper" class="absolute inset-0 overflow-hidden" style="width: 50%;">
+            <img id="compare-recon" class="absolute inset-0 w-full h-full object-contain" style="width: 200%; max-width: none;">
           </div>
-          <div id="compare-handle" class="absolute top-0 bottom-0 w-1 bg-blue-500 cursor-ew-resize" style="left: 50%">
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
-              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
-            </div>
+          <div id="compare-handle" class="absolute top-0 bottom-0 w-0.5 bg-blue-400 cursor-ew-resize" style="left: 50%;">
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">⇄</div>
           </div>
         </div>
-        <input type="range" id="compare-slider" min="0" max="100" value="50" class="w-full mt-4" />
+        <input id="compare-slider" type="range" min="0" max="100" value="50" class="w-full mt-3">
       </div>
     </div>
   </div>
 
-  <!-- Toast -->
-  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-lg bg-gray-800 border border-gray-600 text-sm shadow-xl hidden z-50"></div>
+  <!-- Modal Configurações (BYOK) -->
+  <div id="modal-settings" class="fixed inset-0 modal-backdrop z-50 flex items-center justify-center hidden">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md mx-4 shadow-2xl">
+      <div class="p-5 border-b border-gray-700 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Configurações de OCR</h2>
+        <button id="close-settings-modal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+      <div class="p-5 space-y-5">
+        <p class="text-sm text-gray-400">
+          Escolha o provedor e cole a sua própria chave de API. A chave fica salva apenas no seu navegador.
+        </p>
 
+        <div>
+          <label class="block text-xs text-gray-400 mb-1.5">Provedor</label>
+          <select id="settings-provider" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+            <option value="simulated">Simulado (sem chave)</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="claude">Anthropic Claude</option>
+          </select>
+        </div>
+
+        <div id="settings-key-group">
+          <label class="block text-xs text-gray-400 mb-1.5">Sua chave de API</label>
+          <input id="settings-api-key" type="password" placeholder="Cole a chave aqui..." 
+                 class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono">
+          <p class="text-xs text-gray-500 mt-1.5">A chave nunca é enviada para nossos servidores. Ela só é usada no seu navegador.</p>
+        </div>
+
+        <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3 text-xs text-gray-400 space-y-1">
+          <p><strong class="text-gray-300">Gemini:</strong> aistudio.google.com → Get API key</p>
+          <p><strong class="text-gray-300">OpenAI:</strong> platform.openai.com → API keys</p>
+          <p><strong class="text-gray-300">Claude:</strong> console.anthropic.com → API keys</p>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <button id="btn-clear-settings" class="text-xs text-red-400 hover:text-red-300">Limpar chave</button>
+          <div class="flex gap-2">
+            <button id="btn-cancel-settings" class="btn px-4 py-2 rounded text-sm bg-gray-700 hover:bg-gray-600">Cancelar</button>
+            <button id="btn-save-settings" class="btn px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500">Salvar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="ocrService.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
