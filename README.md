@@ -1,32 +1,48 @@
 # Arte Editavel
 
-App web para transformar artes (PNG/JPG) em camadas editaveis.
+Editor independente estilo Canva que reconstrói artes achatadas (PNG/JPG) em camadas editáveis.
 
-## Como usar (local)
+## Pipeline profissional
 
-1. Baixe o ZIP deste repositorio
-2. Extraia a pasta
-3. No terminal, dentro da pasta:
+```
+Imagem achatada
+  → OCR estruturado (Groq / Gemini / OpenAI / Claude)
+  → Remoção de texto + inpainting (fal.ai) OU Ideogram Layerize
+  → Fundo limpo + textos IText nativos no Fabric.js
+  → Edição tipo Canva + export PNG
+```
+
+### Providers (BYOK — chave só no seu navegador)
+
+| Provider | O que faz | Onde pegar chave |
+|----------|-----------|------------------|
+| **Groq** (grátis) | OCR visão | console.groq.com |
+| **Ideogram Layerize** | Fundo sem texto + blocos de texto | ideogram.ai API |
+| **fal.ai** | Qwen-Image-Layered + object-removal | fal.ai |
+| Gemini / OpenAI / Claude | OCR visão | respectivos consoles |
+
+## Como rodar
 
 ```bash
 npx serve .
 ```
 
-4. Abra **http://localhost:3000** (nao abra o arquivo HTML direto)
-5. Clique em **Config**
-6. Escolha **Groq (gratis)** e cole sua chave de https://console.groq.com
-7. Enviar arte → Transformar em arte editavel
+Abra **http://localhost:3000** (não abra o HTML direto).
 
-## O que funciona
+1. Config → escolha provider e cole a chave
+2. Enviar arte → Transformar → Ir para o editor
+3. Edite textos, mova, exporte PNG
 
-- Upload de PNG/JPG/WEBP
-- Analise com Groq / Gemini / OpenAI / Claude (BYOK)
-- Textos detectados viram camadas editaveis
-- Editar texto, mover, excluir, exportar PNG
+## Arquivos
 
-## Chaves de API
+- `layerService.js` — engine de reconstrução (Ideogram / fal / vision+inpaint)
+- `ocrService.js` — OCR multi-provider
+- `app.js` — editor Fabric.js estilo Canva
+- `index.html` — UI
 
-A chave fica so no seu navegador (localStorage). Nunca e enviada para o GitHub.
+## Diferencial vs abordagem amadora
 
-- Groq (recomendado, gratis): https://console.groq.com
-- Gemini: https://aistudio.google.com
+- Não só “cola texto por cima”
+- Pipeline: detectar → apagar texto da imagem → recriar como camada editável
+- Pronto para Ideogram Layerize (o mesmo tipo de tech por trás de tools de layerize de mercado)
+- Pronto para Qwen-Image-Layered (decomposição RGBA)
