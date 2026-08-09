@@ -2,87 +2,72 @@
 
 Protótipo de aplicativo web para reconstrução e edição de artes gráficas a partir de imagens (PNG, JPG, WEBP).
 
-O objetivo é transformar uma arte pronta em um projeto editável com camadas independentes, textos reais e comandos em português.
+Transforma uma arte pronta em um projeto editável com camadas independentes, textos reais e comandos em português.
 
-## Como rodar localmente (sem OCR real)
+## Como usar (usuário final)
 
-1. Abra a pasta no terminal
-2. Rode um servidor estático:
-   ```bash
-   npx serve .
-   # ou
-   python -m http.server 8080
-   ```
-3. Acesse o endereço que aparecer
+1. Abra o aplicativo
+2. Clique em **Config** (canto superior)
+3. Escolha o provedor de OCR:
+   - **Simulado** → funciona sem chave (modo de demonstração)
+   - **Gemini** → cole sua chave do Google AI Studio
+   - **OpenAI** → cole sua chave da OpenAI
+   - **Claude** → cole sua chave da Anthropic
+4. Salve
+5. Envie uma arte e clique em **Transformar em arte editável**
 
-Neste modo o app usa análise **simulada** (funciona para testar o editor).
+A chave fica salva **somente no seu navegador**. Ela nunca é enviada para nossos servidores.
 
-## Como ativar o OCR real (Gemini) de forma segura
+### Onde conseguir as chaves
 
-A chave da API **nunca** fica no frontend nem no GitHub.
+- **Gemini**: [aistudio.google.com](https://aistudio.google.com) → Get API key
+- **OpenAI**: [platform.openai.com](https://platform.openai.com) → API keys
+- **Claude**: [console.anthropic.com](https://console.anthropic.com) → API keys
 
-### Opção recomendada: Vercel (mais prática)
-
-1. Crie uma conta gratuita em [vercel.com](https://vercel.com)
-2. Importe este repositório
-3. Em **Settings → Environment Variables**, adicione:
-   ```
-   GEMINI_API_KEY = sua_chave_do_google_ai_studio
-   ```
-4. Faça o deploy
-
-O arquivo `api/analyze.js` já está pronto. Ele recebe a imagem, chama o Gemini e devolve o JSON estruturado. A chave fica só no servidor da Vercel.
-
-### Como conseguir a chave do Gemini
-
-1. Acesse [aistudio.google.com](https://aistudio.google.com)
-2. Crie uma API Key
-3. Cole ela apenas na variável de ambiente da Vercel (nunca no código)
-
-### Testando localmente com a chave
-
-Você pode usar o Vercel CLI:
+## Como rodar localmente
 
 ```bash
-npm i -g vercel
-vercel dev
+npx serve .
+# ou
+python -m http.server 8080
 ```
 
-Ele sobe o frontend + a função `/api/analyze` localmente e carrega a variável de ambiente.
+Abra o endereço que aparecer no navegador.
 
-## Estrutura do projeto
+## Estrutura
 
 ```
 arte-editavel/
-├── index.html          # Interface
+├── index.html          # Interface + modal de configurações
 ├── app.js              # Editor (Fabric.js)
-├── ocrService.js       # Abstração do OCR (chama o endpoint seguro)
+├── ocrService.js       # Lógica de OCR multi-provedor (BYOK)
 ├── api/
-│   └── analyze.js      # Função serverless (Vercel) - aqui fica a chamada ao Gemini
+│   └── analyze.js      # Endpoint serverless (opcional, para uso futuro)
 └── README.md
 ```
 
-## Fluxo de análise
+## Modelo de chave (BYOK)
 
-1. Usuário envia a imagem
-2. Frontend chama `/api/analyze` (sem enviar chave)
-3. O servidor usa a chave e consulta o Gemini
-4. Retorna elementos com bounding box, texto, confiança e tipo
-5. O editor cria as camadas editáveis
-6. Usuário revisa e corrige o que precisar
+O aplicativo usa o modelo **Bring Your Own Key**:
 
-## Próximos passos planejados
-
-- Migrar o motor principal para PaddleOCR-VL (self-hosted) quando o volume crescer
-- Manter Gemini como fallback para casos difíceis
-- Melhorar inpainting do fundo e detecção de fontes
+- Cada usuário escolhe o provedor e usa a própria chave
+- Você (dono do app) não paga a conta de OCR de ninguém
+- Fácil de escalar para milhares de usuários
+- O usuário controla o custo e a privacidade
 
 ## Tecnologias
 
 - Fabric.js (editor de canvas)
 - Tailwind CSS
-- Gemini 2.0 Flash (OCR via endpoint seguro)
-- Vercel Serverless Functions
+- Gemini / OpenAI / Claude (via chave do usuário)
+- Análise simulada como fallback
+
+## Próximos passos possíveis
+
+- Adicionar PaddleOCR-VL como opção local/self-hosted
+- Melhorar detecção de fontes e inpainting de fundo
+- Exportação PPTX mais completa
+- Histórico de projetos na nuvem (opcional)
 
 ---
 
