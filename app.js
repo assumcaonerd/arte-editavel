@@ -1,6 +1,6 @@
 /**
- * Arte Editavel - Editor estilo Canva
- * Integra LayerService (fundo limpo + textos IText)
+ * Arte Editavel - Editor Canva-style
+ * Prioridade: capas sob texto + OCR + camadas Fabric
  */
 (function () {
   'use strict';
@@ -11,11 +11,9 @@
     originalImageDataUrl: null,
     cleanBackgroundUrl: null,
     detectedElements: [],
-    reconstruction: null,
     history: [],
     historyIndex: -1
   };
-
   window.__arteState = state;
 
   function $(s) { return document.querySelector(s); }
@@ -27,7 +25,7 @@
     el.textContent = msg;
     el.classList.remove('hidden');
     clearTimeout(el._t);
-    el._t = setTimeout(function () { el.classList.add('hidden'); }, 3000);
+    el._t = setTimeout(function () { el.classList.add('hidden'); }, 3200);
   }
 
   function initCanvas() {
@@ -78,7 +76,7 @@
       if ($('#prop-text-content')) $('#prop-text-content').value = obj.text || '';
       if ($('#prop-font-size')) $('#prop-font-size').value = Math.round(obj.fontSize || 24);
       if ($('#prop-font-family')) $('#prop-font-family').value = obj.fontFamily || 'Impact';
-      if ($('#prop-text-color')) $('#prop-text-color').value = (obj.fill && obj.fill.indexOf('#') === 0) ? obj.fill : '#ffffff';
+      if ($('#prop-text-color')) $('#prop-text-color').value = (obj.fill && String(obj.fill).indexOf('#') === 0) ? obj.fill : '#ffffff';
     }
     if ($('#prop-left')) $('#prop-left').value = Math.round(obj.left || 0);
     if ($('#prop-top')) $('#prop-top').value = Math.round(obj.top || 0);
@@ -87,7 +85,7 @@
 
   function saveHistory() {
     if (!state.canvas) return;
-    var json = JSON.stringify(state.canvas.toJSON(['name', 'layerType', 'confidence']));
+    var json = JSON.stringify(state.canvas.toJSON(['name', 'layerType']));
     state.history = state.history.slice(0, state.historyIndex + 1);
     state.history.push(json);
     if (state.history.length > 40) state.history.shift();
@@ -175,21 +173,18 @@
 
   async function startAnalysis() {
     if (!state.originalImageDataUrl) return;
-
     if ($('#upload-step-1')) $('#upload-step-1').classList.add('hidden');
     if ($('#upload-step-2')) $('#upload-step-2').classList.remove('hidden');
     if ($('#upload-step-3')) $('#upload-step-3').classList.add('hidden');
+    if ($('#analysis-status')) $('#analysis-status').textContent = 'Analisando...';
+    if ($('#analysis-detail')) $('#analysis-detail').textContent = 'OCR + camadas';
+    if ($('#analysis-progress')) $('#analysis-progress').style.width = '30%';
 
-    if ($('#analysis-status')) $('#analysis-status').textContent = 'Reconstruindo camadas...';
-    if ($('#analysis-detail')) $('#analysis-detail').textContent = 'OCR + fundo limpo';
-    if ($('#analysis-progress')) $('#analysis-progress').style.width = '25%';
-
-    var result;
+    var result = { elements: [], simulated: true };
     try {
       if (window.LayerService) {
         if ($('#analysis-progress')) $('#analysis-progress').style.width = '50%';
         var recon = await window.LayerService.reconstruct(state.originalImageDataUrl);
-        state.reconstruction = recon;
         if (recon.backgroundUrl) state.cleanBackgroundUrl = recon.backgroundUrl;
         result = {
           elements: (recon.texts || []).map(function (t, i) {
@@ -199,19 +194,16 @@
               label: t.label || ('Texto ' + (i + 1)),
               text: t.text,
               bbox: { x: t.x, y: t.y, w: t.w, h: t.h },
-              color: t.color,
-              fontGuess: t.fontFamily,
+              color: t.color || '#ffffff',
+              fontGuess: t.fontFamily || 'Impact',
               confidence: 'high'
             };
           }),
           provider: recon.provider,
-          simulated: recon.simulated,
-          backgroundUrl: recon.backgroundUrl
+          simulated: !!recon.simulated
         };
       } else if (window.OCRService) {
         result = await window.OCRService.analyzeImage(state.originalImageDataUrl);
-      } else {
-        result = { elements: [], simulated: true };
       }
     } catch (err) {
       console.error(err);
@@ -220,17 +212,14 @@
 
     if ($('#analysis-progress')) $('#analysis-progress').style.width = '100%';
     state.detectedElements = result.elements || [];
-
     if ($('#analysis-status')) {
       $('#analysis-status').textContent = result.simulated
         ? 'Modo simulado - configure chave em Config'
-        : 'Reconstrucao (' + (result.provider || 'IA') + ')';
+        : 'OK (' + (result.provider || 'IA') + ')';
     }
     if ($('#analysis-detail')) {
-      $('#analysis-detail').textContent = state.detectedElements.length + ' textos' +
-        (state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl ? ' + fundo limpo' : '');
+      $('#analysis-detail').textContent = state.detectedElements.length + ' elementos';
     }
-
     var box = $('#detected-elements');
     if (box) {
       box.innerHTML = '';
@@ -243,11 +232,10 @@
         box.appendChild(d);
       });
     }
-
     setTimeout(function () {
       if ($('#upload-step-2')) $('#upload-step-2').classList.add('hidden');
       if ($('#upload-step-3')) $('#upload-step-3').classList.remove('hidden');
-    }, 350);
+    }, 300);
   }
 
   function goToEditor() {
@@ -256,9 +244,6 @@
       toast('Imagem nao carregada');
       return;
     }
-
-    document.querySelectorAll('.grok-text-overlay').forEach(function (n) { n.remove(); });
-
     var img = state.originalImage;
     var maxW = Math.min(860, window.innerWidth - 480);
     var maxH = Math.min(620, window.innerHeight - 150);
@@ -279,22 +264,37 @@
         left: 0, top: 0,
         scaleX: scale, scaleY: scale,
         selectable: true,
-        name: state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl
-          ? 'Fundo limpo' : 'Imagem (fundo)',
+        name: (state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl) ? 'Fundo limpo' : 'Imagem (fundo)',
         layerType: 'background'
       });
       state.canvas.add(fabricImg);
       state.canvas.sendToBack(fabricImg);
 
-      var elements = state.detectedElements || [];
-      var textEls = elements.filter(function (e) { return e.type === 'text' && e.text; });
+      var textEls = (state.detectedElements || []).filter(function (e) {
+        return e.type === 'text' && e.text;
+      });
 
       textEls.forEach(function (el, i) {
         var bbox = el.bbox || {};
         var x = (typeof bbox.x === 'number' ? bbox.x : 0.06) * displayW;
         var y = (typeof bbox.y === 'number' ? bbox.y : (0.05 + i * 0.1)) * displayH;
+        var w = (typeof bbox.w === 'number' ? bbox.w : 0.88) * displayW;
         var h = (typeof bbox.h === 'number' ? bbox.h : 0.09) * displayH;
         var fontSize = Math.max(16, Math.min(56, h * 0.75));
+        var textW = Math.max(w, (el.text || '').length * fontSize * 0.52);
+
+        var cover = new fabric.Rect({
+          left: Math.max(0, x - 6),
+          top: Math.max(0, y - 4),
+          width: textW + 12,
+          height: h + 10,
+          fill: '#0a0a0a',
+          opacity: 0.95,
+          selectable: true,
+          name: 'Capa',
+          layerType: 'cover'
+        });
+        state.canvas.add(cover);
 
         var text = new fabric.IText(el.text, {
           left: x,
@@ -304,8 +304,7 @@
           fill: el.color || '#ffffff',
           name: el.text.substring(0, 32),
           layerType: 'text',
-          confidence: el.confidence || 'medium',
-          shadow: 'rgba(0,0,0,0.6) 1px 1px 3px',
+          shadow: 'rgba(0,0,0,0.55) 1px 1px 3px',
           editable: true
         });
         state.canvas.add(text);
@@ -314,10 +313,7 @@
       state.canvas.requestRenderAll();
       updateLayersPanel();
       saveHistory();
-
-      var n = textEls.length;
-      var clean = state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl;
-      toast(n + ' textos editaveis' + (clean ? ' sobre fundo limpo' : '') + '. Clique para editar.');
+      toast(textEls.length + ' textos editaveis com capa. Clique para editar.');
     }, { crossOrigin: 'anonymous' });
   }
 
@@ -372,53 +368,43 @@
   }
 
   function bindProps() {
-    if ($('#prop-text-content')) {
-      $('#prop-text-content').addEventListener('input', function (e) {
-        var obj = state.canvas && state.canvas.getActiveObject();
-        if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
-          obj.set('text', e.target.value);
-          obj.set('name', e.target.value.substring(0, 32));
-          state.canvas.requestRenderAll();
-          updateLayersPanel();
-        }
-      });
+    function bind(id, fn) {
+      var el = $(id);
+      if (el) el.addEventListener(id.indexOf('color') >= 0 || id.indexOf('opacity') >= 0 || id.indexOf('content') >= 0 ? 'input' : 'change', fn);
     }
-    if ($('#prop-font-size')) {
-      $('#prop-font-size').addEventListener('change', function (e) {
-        var obj = state.canvas && state.canvas.getActiveObject();
-        if (obj) { obj.set('fontSize', parseInt(e.target.value, 10)); state.canvas.requestRenderAll(); }
-      });
-    }
-    if ($('#prop-font-family')) {
-      $('#prop-font-family').addEventListener('change', function (e) {
-        var obj = state.canvas && state.canvas.getActiveObject();
-        if (obj) { obj.set('fontFamily', e.target.value); state.canvas.requestRenderAll(); }
-      });
-    }
-    if ($('#prop-text-color')) {
-      $('#prop-text-color').addEventListener('input', function (e) {
-        var obj = state.canvas && state.canvas.getActiveObject();
-        if (obj) { obj.set('fill', e.target.value); state.canvas.requestRenderAll(); }
-      });
-    }
-    if ($('#prop-left')) {
-      $('#prop-left').addEventListener('change', function (e) {
-        var obj = state.canvas && state.canvas.getActiveObject();
-        if (obj) { obj.set('left', parseInt(e.target.value, 10)); state.canvas.requestRenderAll(); }
-      });
-    }
-    if ($('#prop-top')) {
-      $('#prop-top').addEventListener('change', function (e) {
-        var obj = state.canvas && state.canvas.getActiveObject();
-        if (obj) { obj.set('top', parseInt(e.target.value, 10)); state.canvas.requestRenderAll(); }
-      });
-    }
-    if ($('#prop-opacity')) {
-      $('#prop-opacity').addEventListener('input', function (e) {
-        var obj = state.canvas && state.canvas.getActiveObject();
-        if (obj) { obj.set('opacity', parseInt(e.target.value, 10) / 100); state.canvas.requestRenderAll(); }
-      });
-    }
+    bind('#prop-text-content', function (e) {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+        obj.set('text', e.target.value);
+        obj.set('name', e.target.value.substring(0, 32));
+        state.canvas.requestRenderAll();
+        updateLayersPanel();
+      }
+    });
+    bind('#prop-font-size', function (e) {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('fontSize', parseInt(e.target.value, 10)); state.canvas.requestRenderAll(); }
+    });
+    bind('#prop-font-family', function (e) {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('fontFamily', e.target.value); state.canvas.requestRenderAll(); }
+    });
+    bind('#prop-text-color', function (e) {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('fill', e.target.value); state.canvas.requestRenderAll(); }
+    });
+    bind('#prop-left', function (e) {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('left', parseInt(e.target.value, 10)); state.canvas.requestRenderAll(); }
+    });
+    bind('#prop-top', function (e) {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('top', parseInt(e.target.value, 10)); state.canvas.requestRenderAll(); }
+    });
+    bind('#prop-opacity', function (e) {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('opacity', parseInt(e.target.value, 10) / 100); state.canvas.requestRenderAll(); }
+    });
   }
 
   function bindEvents() {
@@ -482,6 +468,6 @@
   document.addEventListener('DOMContentLoaded', function () {
     initCanvas();
     bindEvents();
-    console.log('Arte Editavel + LayerService pronto');
+    console.log('Arte Editavel pronto - capas + OCR');
   });
 })();
