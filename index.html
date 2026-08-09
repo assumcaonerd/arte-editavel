@@ -25,18 +25,15 @@
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
 
-  <!-- Header -->
   <header class="h-12 panel border-b flex items-center px-4 gap-3 shrink-0">
     <div class="flex items-center gap-2 mr-4">
       <div class="w-7 h-7 rounded bg-blue-600 flex items-center justify-center text-sm font-bold">AE</div>
       <span class="font-semibold text-sm hidden sm:inline">Arte Editável</span>
     </div>
-
     <div class="flex items-center gap-1 ml-2">
       <button id="btn-undo" class="btn px-2 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600" title="Desfazer">↩</button>
       <button id="btn-redo" class="btn px-2 py-1 rounded text-xs bg-gray-700 hover:bg-gray-600" title="Refazer">↪</button>
     </div>
-
     <select id="format-select" class="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs ml-3 focus:outline-none">
       <option value="original">Original</option>
       <option value="1080x1080">Quadrado 1080</option>
@@ -46,16 +43,13 @@
       <option value="a4">A4</option>
       <option value="custom">Personalizado</option>
     </select>
-
     <button id="btn-settings" class="btn px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600 flex items-center gap-1.5" title="Configurações de OCR">
       <span>⚙</span> Config
     </button>
     <button id="btn-compare" class="btn px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600 flex items-center gap-1.5">
       <span>⇄</span> Comparar
     </button>
-
     <div class="flex-1"></div>
-
     <input id="project-name" type="text" value="Projeto sem nome" class="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs w-40 focus:outline-none focus:border-blue-500">
     <button id="btn-save" class="btn px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600">Salvar</button>
     <div class="relative">
@@ -72,36 +66,21 @@
     </div>
   </header>
 
-  <!-- Main -->
   <div class="flex-1 flex overflow-hidden">
-
-    <!-- Left sidebar -->
     <aside class="w-56 panel border-r flex flex-col shrink-0 overflow-y-auto">
       <div class="p-3 border-b border-gray-700">
         <button id="btn-upload" class="w-full btn py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium flex items-center justify-center gap-2">
           <span>⬆</span> Enviar arte
         </button>
       </div>
-
       <div class="p-3 space-y-1">
         <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Ferramentas</p>
-        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2 active" data-tool="select">
-          <span>↖</span> Selecionar
-        </button>
-        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="text">
-          <span>T</span> Texto
-        </button>
-        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="rect">
-          <span>□</span> Retângulo
-        </button>
-        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="circle">
-          <span>○</span> Círculo
-        </button>
-        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="image">
-          <span>🖼</span> Imagem
-        </button>
+        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2 active" data-tool="select"><span>↖</span> Selecionar</button>
+        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="text"><span>T</span> Texto</button>
+        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="rect"><span>□</span> Retângulo</button>
+        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="circle"><span>○</span> Círculo</button>
+        <button class="tool-btn w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2" data-tool="image"><span>🖼</span> Imagem</button>
       </div>
-
       <div class="p-3 space-y-2 border-t border-gray-700">
         <p class="text-xs text-gray-500 uppercase tracking-wider">Ações rápidas</p>
         <button id="btn-add-text" class="w-full btn py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600">+ Texto</button>
@@ -112,91 +91,55 @@
       </div>
     </aside>
 
-    <!-- Canvas area -->
     <main class="flex-1 flex flex-col overflow-hidden">
       <div id="canvas-container" class="flex-1 flex items-center justify-center overflow-auto p-6">
         <canvas id="main-canvas"></canvas>
       </div>
-
-      <!-- Natural language bar -->
       <div class="h-14 panel border-t flex items-center px-4 gap-3 shrink-0">
         <span class="text-xs text-gray-500 shrink-0">Comando:</span>
-        <input id="nl-command" type="text" placeholder='Ex: "Mude o título para Novo Título", "Deixe o fundo azul-escuro", "Centralize os textos"'
-               class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+        <input id="nl-command" type="text" placeholder='Ex: "Mude o título para Novo Título", "Deixe o fundo azul-escuro"' class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
         <button id="btn-run-command" class="btn px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-sm">Executar</button>
       </div>
     </main>
 
-    <!-- Right sidebar -->
     <aside class="w-64 panel border-l flex flex-col shrink-0 overflow-hidden">
       <div class="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
         <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Camadas</span>
         <button id="btn-refresh-layers" class="text-xs text-gray-500 hover:text-white">↻</button>
       </div>
       <div id="layers-list" class="flex-1 overflow-y-auto p-2 space-y-0.5"></div>
-
       <div class="border-t border-gray-700">
-        <div class="px-3 py-2 border-b border-gray-700">
-          <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Propriedades</span>
-        </div>
+        <div class="px-3 py-2 border-b border-gray-700"><span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Propriedades</span></div>
         <div id="props-empty" class="p-4 text-xs text-gray-500 text-center">Selecione um elemento</div>
         <div id="props-content" class="hidden p-3 space-y-3 text-xs overflow-y-auto max-h-80">
           <div id="props-text" class="space-y-2">
             <label class="block text-gray-400">Texto</label>
             <textarea id="prop-text-content" rows="2" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none"></textarea>
             <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-gray-400 mb-1">Fonte</label>
-                <select id="prop-font-family" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1">
-                  <option>Inter</option><option>Montserrat</option><option>Oswald</option>
-                  <option>Roboto</option><option>Arial</option><option>Georgia</option>
-                </select>
+              <div><label class="block text-gray-400 mb-1">Fonte</label>
+                <select id="prop-font-family" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"><option>Inter</option><option>Montserrat</option><option>Oswald</option><option>Impact</option><option>Arial</option></select>
               </div>
-              <div>
-                <label class="block text-gray-400 mb-1">Tamanho</label>
-                <input id="prop-font-size" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1">
-              </div>
+              <div><label class="block text-gray-400 mb-1">Tamanho</label><input id="prop-font-size" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
             </div>
             <div class="flex gap-2 items-center">
               <label class="text-gray-400">Cor</label>
               <input id="prop-text-color" type="color" value="#ffffff" class="w-8 h-8 rounded cursor-pointer">
               <button id="prop-bold" class="btn px-2 py-1 bg-gray-700 rounded font-bold">B</button>
               <button id="prop-italic" class="btn px-2 py-1 bg-gray-700 rounded italic">I</button>
-              <button id="prop-underline" class="btn px-2 py-1 bg-gray-700 rounded underline">U</button>
-            </div>
-            <div class="flex gap-1">
-              <button class="align-btn btn px-2 py-1 bg-gray-700 rounded" data-align="left">⬅</button>
-              <button class="align-btn btn px-2 py-1 bg-gray-700 rounded" data-align="center">↔</button>
-              <button class="align-btn btn px-2 py-1 bg-gray-700 rounded" data-align="right">➡</button>
             </div>
           </div>
-
           <div class="space-y-2 pt-2 border-t border-gray-700">
             <div class="grid grid-cols-2 gap-2">
               <div><label class="text-gray-400">X</label><input id="prop-left" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
               <div><label class="text-gray-400">Y</label><input id="prop-top" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
-              <div><label class="text-gray-400">Largura</label><input id="prop-width" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
-              <div><label class="text-gray-400">Altura</label><input id="prop-height" type="number" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1"></div>
             </div>
-            <div>
-              <label class="text-gray-400">Opacidade</label>
-              <input id="prop-opacity" type="range" min="0" max="100" value="100" class="w-full">
-            </div>
-            <div>
-              <label class="text-gray-400">Rotação</label>
-              <input id="prop-angle" type="range" min="0" max="360" value="0" class="w-full">
-            </div>
-            <div class="flex gap-2">
-              <button id="prop-lock" class="btn flex-1 py-1.5 bg-gray-700 rounded">🔒 Bloquear</button>
-              <button id="prop-hide" class="btn flex-1 py-1.5 bg-gray-700 rounded">👁 Ocultar</button>
-            </div>
+            <div><label class="text-gray-400">Opacidade</label><input id="prop-opacity" type="range" min="0" max="100" value="100" class="w-full"></div>
           </div>
         </div>
       </div>
     </aside>
   </div>
 
-  <!-- Toast -->
   <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 text-sm px-4 py-2.5 rounded-lg shadow-xl z-50"></div>
 
   <!-- Modal Upload -->
@@ -204,13 +147,12 @@
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="p-5 border-b border-gray-700 flex items-center justify-between">
         <h2 class="text-lg font-semibold">Enviar arte</h2>
-        <button id="close-upload-modal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+        <button id="close-upload-modal" class="text-gray-400 hover:text-white text-xl">&times;</button>
       </div>
-
       <div id="upload-step-1" class="p-5">
         <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl p-10 text-center cursor-pointer hover:border-blue-500 transition">
-          <p class="text-gray-400 mb-2">Arraste uma imagem ou clique para selecionar</p>
-          <p class="text-xs text-gray-500">PNG, JPG, JPEG ou WEBP</p>
+          <p class="text-gray-400 mb-2">Arraste uma imagem ou clique</p>
+          <p class="text-xs text-gray-500">PNG, JPG, WEBP</p>
           <input id="file-input" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" class="hidden">
         </div>
         <div id="preview-container" class="hidden mt-4">
@@ -222,17 +164,15 @@
           <button id="btn-start-analysis" class="btn px-4 py-2 rounded text-sm bg-blue-600 hover:bg-blue-500" disabled>Transformar em arte editável</button>
         </div>
       </div>
-
       <div id="upload-step-2" class="p-5 hidden">
         <div class="text-center py-6">
           <p id="analysis-status" class="text-sm font-medium mb-1">Analisando...</p>
           <p id="analysis-detail" class="text-xs text-gray-500 mb-4">Preparando</p>
           <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-            <div id="analysis-progress" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            <div id="analysis-progress" class="bg-blue-500 h-2 rounded-full transition-all" style="width:0%"></div>
           </div>
         </div>
       </div>
-
       <div id="upload-step-3" class="p-5 hidden">
         <p class="text-sm font-medium mb-3">Elementos encontrados</p>
         <div id="detected-elements" class="space-y-2 max-h-64 overflow-y-auto mb-5"></div>
@@ -244,63 +184,35 @@
     </div>
   </div>
 
-  <!-- Modal Compare -->
-  <div id="modal-compare" class="fixed inset-0 modal-backdrop z-50 flex items-center justify-center hidden">
-    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-3xl mx-4 shadow-2xl">
-      <div class="p-4 border-b border-gray-700 flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Comparar original × reconstrução</h2>
-        <button id="close-compare-modal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
-      </div>
-      <div class="p-4 relative">
-        <div class="relative overflow-hidden rounded-lg border border-gray-700" style="height: 400px;">
-          <img id="compare-original" class="absolute inset-0 w-full h-full object-contain">
-          <div id="compare-recon-wrapper" class="absolute inset-0 overflow-hidden" style="width: 50%;">
-            <img id="compare-recon" class="absolute inset-0 w-full h-full object-contain" style="width: 200%; max-width: none;">
-          </div>
-          <div id="compare-handle" class="absolute top-0 bottom-0 w-0.5 bg-blue-400 cursor-ew-resize" style="left: 50%;">
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">⇄</div>
-          </div>
-        </div>
-        <input id="compare-slider" type="range" min="0" max="100" value="50" class="w-full mt-3">
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Configurações (BYOK) -->
+  <!-- Modal Settings -->
   <div id="modal-settings" class="fixed inset-0 modal-backdrop z-50 flex items-center justify-center hidden">
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md mx-4 shadow-2xl">
       <div class="p-5 border-b border-gray-700 flex items-center justify-between">
         <h2 class="text-lg font-semibold">Configurações de OCR</h2>
-        <button id="close-settings-modal" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+        <button id="close-settings-modal" class="text-gray-400 hover:text-white text-xl">&times;</button>
       </div>
       <div class="p-5 space-y-5">
-        <p class="text-sm text-gray-400">
-          Escolha o provedor e cole a sua própria chave de API. A chave fica salva apenas no seu navegador.
-        </p>
-
+        <p class="text-sm text-gray-400">Escolha o provedor e cole a sua chave. A chave fica só no seu navegador.</p>
         <div>
           <label class="block text-xs text-gray-400 mb-1.5">Provedor</label>
-          <select id="settings-provider" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+          <select id="settings-provider" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
             <option value="simulated">Simulado (sem chave)</option>
             <option value="gemini">Google Gemini</option>
+            <option value="groq">Groq (grátis)</option>
             <option value="openai">OpenAI (GPT)</option>
             <option value="claude">Anthropic Claude</option>
           </select>
         </div>
-
         <div id="settings-key-group">
           <label class="block text-xs text-gray-400 mb-1.5">Sua chave de API</label>
-          <input id="settings-api-key" type="password" placeholder="Cole a chave aqui..." 
-                 class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 font-mono">
-          <p class="text-xs text-gray-500 mt-1.5">A chave nunca é enviada para nossos servidores. Ela só é usada no seu navegador.</p>
+          <input id="settings-api-key" type="password" placeholder="Cole a chave aqui..." class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm font-mono">
         </div>
-
         <div class="bg-gray-800/60 border border-gray-700 rounded-lg p-3 text-xs text-gray-400 space-y-1">
-          <p><strong class="text-gray-300">Gemini:</strong> aistudio.google.com → Get API key</p>
-          <p><strong class="text-gray-300">OpenAI:</strong> platform.openai.com → API keys</p>
-          <p><strong class="text-gray-300">Claude:</strong> console.anthropic.com → API keys</p>
+          <p><strong class="text-gray-300">Gemini:</strong> aistudio.google.com</p>
+          <p><strong class="text-gray-300">Groq:</strong> console.groq.com (grátis)</p>
+          <p><strong class="text-gray-300">OpenAI:</strong> platform.openai.com</p>
+          <p><strong class="text-gray-300">Claude:</strong> console.anthropic.com</p>
         </div>
-
         <div class="flex items-center justify-between pt-2">
           <button id="btn-clear-settings" class="text-xs text-red-400 hover:text-red-300">Limpar chave</button>
           <div class="flex gap-2">
@@ -314,5 +226,54 @@
 
   <script src="ocrService.js"></script>
   <script src="app.js"></script>
+  <script>
+  // Config BYOK - sempre funciona (independente do app.js)
+  (function() {
+    function openSettings() {
+      var modal = document.getElementById('modal-settings');
+      if (!modal) return;
+      try {
+        var s = JSON.parse(localStorage.getItem('arte-editavel-ocr-settings') || '{}');
+        var p = document.getElementById('settings-provider');
+        var k = document.getElementById('settings-api-key');
+        if (p) p.value = s.provider || 'simulated';
+        if (k) k.value = s.apiKey || '';
+      } catch(e) {}
+      modal.classList.remove('hidden');
+    }
+    function closeSettings() {
+      var modal = document.getElementById('modal-settings');
+      if (modal) modal.classList.add('hidden');
+    }
+    function saveSettings() {
+      var provider = (document.getElementById('settings-provider') || {}).value || 'simulated';
+      var apiKey = ((document.getElementById('settings-api-key') || {}).value || '').trim();
+      localStorage.setItem('arte-editavel-ocr-settings', JSON.stringify({ provider: provider, apiKey: apiKey }));
+      closeSettings();
+      var labels = { simulated: 'Simulado', gemini: 'Gemini', groq: 'Groq', openai: 'OpenAI', claude: 'Claude' };
+      alert('Configuração salva: ' + (labels[provider] || provider));
+    }
+    function clearSettings() {
+      localStorage.removeItem('arte-editavel-ocr-settings');
+      var p = document.getElementById('settings-provider');
+      var k = document.getElementById('settings-api-key');
+      if (p) p.value = 'simulated';
+      if (k) k.value = '';
+      alert('Chave removida');
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      var btn = document.getElementById('btn-settings');
+      if (btn) btn.addEventListener('click', openSettings);
+      var c1 = document.getElementById('close-settings-modal');
+      if (c1) c1.addEventListener('click', closeSettings);
+      var c2 = document.getElementById('btn-cancel-settings');
+      if (c2) c2.addEventListener('click', closeSettings);
+      var s = document.getElementById('btn-save-settings');
+      if (s) s.addEventListener('click', saveSettings);
+      var cl = document.getElementById('btn-clear-settings');
+      if (cl) cl.addEventListener('click', clearSettings);
+    });
+  })();
+  </script>
 </body>
 </html>
