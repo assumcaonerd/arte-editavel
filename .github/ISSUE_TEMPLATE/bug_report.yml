@@ -1,0 +1,38 @@
+name: Relatar um erro
+description: Informe um problema reproduzível no aplicativo
+title: "[Erro]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Obrigado por ajudar a melhorar o Arte Editável. Não inclua chaves de API nem dados pessoais.
+  - type: textarea
+    id: descricao
+    attributes:
+      label: O que aconteceu?
+      description: Explique claramente o erro encontrado.
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir?
+      description: Liste os passos necessários para o problema aparecer.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que deveria acontecer?
+    validations:
+      required: true
+  - type: input
+    id: ambiente
+    attributes:
+      label: Navegador e sistema operacional
+      placeholder: Exemplo, Chrome 151 no Windows 11
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Informações adicionais
+      description: Adicione mensagens de erro, capturas de tela ou outros detalhes sem dados sensíveis.
