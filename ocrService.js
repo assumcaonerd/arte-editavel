@@ -62,6 +62,11 @@ async function callLocalOCR(imageDataUrl) {
   var worker = await window.Tesseract.createWorker('por+eng');
   var result;
   try {
+    await worker.setParameters({
+      tessedit_pageseg_mode: window.Tesseract.PSM.SPARSE_TEXT,
+      preserve_interword_spaces: '1',
+      user_defined_dpi: '300'
+    });
     result = await worker.recognize(imageDataUrl, {}, { tsv: true });
   } finally {
     await worker.terminate();
@@ -111,7 +116,7 @@ function parseTsvLines(tsv, imageWidth, imageHeight) {
     if (cols.length < 12 || Number(cols[0]) !== 5) return;
     var text = cols.slice(11).join('\t').trim();
     var confidence = Number(cols[10]);
-    if (!text || confidence < 15) return;
+    if (!text || confidence < 40) return;
     var key = cols[1] + ':' + cols[2] + ':' + cols[3] + ':' + cols[4];
     var left = Number(cols[6]);
     var top = Number(cols[7]);
@@ -139,7 +144,12 @@ function parseTsvLines(tsv, imageWidth, imageHeight) {
       height: Math.min(imageHeight, group.bottom) - Math.max(0, group.top),
       confidence: group.confidence / group.count
     };
-  }).filter(function (line) { return line.text.length > 1 && line.width > 0 && line.height > 0; });
+  }).filter(function (line) {
+    if (line.text.length < 3 || line.width <= 0 || line.height <= 0 || line.confidence < 48) return false;
+    var useful = (line.text.match(/[\p{L}\p{N}@#%.,!?/:()\-\s]/gu) || []).length;
+    var letters = (line.text.match(/[\p{L}\p{N}]/gu) || []).length;
+    return letters >= 2 && useful / line.text.length >= 0.82;
+  });
 }
 
 async function callGroq(base64Data, mimeType, apiKey) {
