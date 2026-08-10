@@ -305,7 +305,9 @@
             };
           }),
           provider: recon.provider,
-          simulated: !!recon.simulated
+          simulated: !!recon.simulated,
+          warning: recon.raw && recon.raw.warning,
+          error: recon.raw && recon.raw.error
         };
       } else if (window.OCRService) {
         result = await window.OCRService.analyzeImage(state.originalImageDataUrl);
@@ -318,12 +320,16 @@
     if ($('#analysis-progress')) $('#analysis-progress').style.width = '100%';
     state.detectedElements = result.elements || [];
     if ($('#analysis-status')) {
-      $('#analysis-status').textContent = result.simulated
-        ? 'Modo simulado - configure chave em Config'
-        : 'OK (' + (result.provider || 'IA') + ')';
+      $('#analysis-status').textContent = result.error
+        ? 'Não foi possível reconhecer os textos'
+        : result.warning
+          ? 'Nenhum texto reconhecido'
+          : result.simulated
+            ? 'Configure o OCR em Config'
+            : 'OK (' + (result.provider || 'IA') + ')';
     }
     if ($('#analysis-detail')) {
-      $('#analysis-detail').textContent = state.detectedElements.length + ' elementos';
+      $('#analysis-detail').textContent = result.error || result.warning || (state.detectedElements.length + ' elementos');
     }
     var box = $('#detected-elements');
     if (box) {
