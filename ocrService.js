@@ -4,7 +4,7 @@
  */
 
 var STORAGE_KEY = 'arte-editavel-ocr-settings';
-var DEFAULT_SETTINGS = { provider: 'simulated', apiKey: '' };
+var DEFAULT_SETTINGS = { provider: 'local', apiKey: '' };
 
 function getSettings() {
   try {
@@ -26,12 +26,15 @@ function clearSettings() {
 
 async function analyzeImage(imageDataUrl) {
   var settings = getSettings();
-  var provider = settings.provider || 'simulated';
+  var provider = settings.provider || 'local';
   var apiKey = (settings.apiKey || '').trim();
 
-  if (provider === 'simulated' || !apiKey) {
-    console.log('[OCR] Modo simulado');
-    return getSimulatedAnalysis();
+  if (provider === 'local' || provider === 'simulated') {
+    return await callLocalOCR(imageDataUrl);
+  }
+
+  if (!apiKey) {
+    throw new Error('Informe a chave do provedor ou selecione o OCR local.');
   }
 
   var match = imageDataUrl.match(/^data:(image\/\w+);base64,/);
@@ -51,6 +54,44 @@ async function analyzeImage(imageDataUrl) {
     fallback.providerAttempted = provider;
     return fallback;
   }
+}
+
+async function callLocalOCR(imageDataUrl) {
+  if (!window.Tesseract) throw new Error('OCR local não carregado. Verifique sua conexão e recarregue a página.');
+  var result = await window.Tesseract.recognize(imageDataUrl, 'por+eng');
+  var data = result.data || {};
+  var width = 1;
+  var height = 1;
+  if (data.words && data.words.length) {
+    data.words.forEach(function (word) {
+      if (word.bbox) {
+        width = Math.max(width, word.bbox.x1 || 0);
+        height = Math.max(height, word.bbox.y1 || 0);
+      }
+    });
+  }
+  var lines = (data.lines || []).filter(function (line) {
+    return line.text && line.text.trim().length > 1 && (line.confidence == null || line.confidence >= 25);
+  });
+  var elements = lines.map(function (line, i) {
+    var box = line.bbox || { x0: 0, y0: 0, x1: width, y1: Math.max(20, height * 0.08) };
+    return {
+      id: 'text-' + (i + 1),
+      type: 'text',
+      label: i === 0 ? 'Título' : 'Texto ' + (i + 1),
+      text: line.text.trim(),
+      bbox: {
+        x: box.x0 / width,
+        y: box.y0 / height,
+        w: Math.max(0.02, (box.x1 - box.x0) / width),
+        h: Math.max(0.02, (box.y1 - box.y0) / height)
+      },
+      confidence: line.confidence >= 75 ? 'high' : line.confidence >= 50 ? 'medium' : 'low',
+      color: '#ffffff',
+      fontGuess: i === 0 ? 'Impact' : 'Arial'
+    };
+  });
+  return { elements: elements, provider: 'OCR local', simulated: false, raw: data.text || '' };
 }
 
 async function callGroq(base64Data, mimeType, apiKey) {
@@ -222,13 +263,7 @@ function parseTextToElements(text, provider) {
 
 function getSimulatedAnalysis() {
   return {
-    elements: [
-      { id: 'bg-1', type: 'background', label: 'Fundo', confidence: 'high', bbox: { x: 0, y: 0, w: 1, h: 1 }, color: '#1a1a2e' },
-      { id: 'photo-1', type: 'photo', label: 'Fotografia principal', confidence: 'medium', bbox: { x: 0.05, y: 0.1, w: 0.45, h: 0.7 } },
-      { id: 'text-1', type: 'text', label: 'Titulo (estimado)', confidence: 'medium', bbox: { x: 0.52, y: 0.15, w: 0.42, h: 0.12 }, text: 'Titulo da Arte', fontGuess: 'Montserrat', color: '#ffffff' },
-      { id: 'text-2', type: 'text', label: 'Subtitulo', confidence: 'low', bbox: { x: 0.52, y: 0.3, w: 0.4, h: 0.08 }, text: 'Texto secundario', fontGuess: 'Inter', color: '#cccccc' },
-      { id: 'logo-1', type: 'logo', label: 'Possivel logotipo', confidence: 'low', bbox: { x: 0.75, y: 0.8, w: 0.18, h: 0.12 } }
-    ],
+    elements: [],
     simulated: true,
     provider: 'simulated'
   };

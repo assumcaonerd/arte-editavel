@@ -12,7 +12,8 @@
     cleanBackgroundUrl: null,
     detectedElements: [],
     history: [],
-    historyIndex: -1
+    historyIndex: -1,
+    compareOverlay: null
   };
   window.__arteState = state;
 
@@ -92,6 +93,103 @@
     state.historyIndex = state.history.length - 1;
   }
 
+  function download(content, filename, type) {
+    var a = document.createElement('a');
+    a.href = content instanceof Blob ? URL.createObjectURL(content) : content;
+    a.download = filename;
+    a.click();
+    if (content instanceof Blob) setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function projectName(ext) {
+    var name = (($('#project-name') && $('#project-name').value) || 'arte').trim() || 'arte';
+    return name.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) + '.' + ext;
+  }
+
+  function saveProject() {
+    if (!state.canvas) return;
+    var payload = {
+      version: 1,
+      name: ($('#project-name') && $('#project-name').value) || 'Projeto sem nome',
+      width: state.canvas.getWidth(),
+      height: state.canvas.getHeight(),
+      canvas: state.canvas.toJSON(['name', 'layerType'])
+    };
+    try {
+      localStorage.setItem('arte-editavel-project', JSON.stringify(payload));
+      toast('Projeto salvo neste navegador');
+    } catch (err) {
+      toast('Não foi possível salvar: projeto muito grande');
+    }
+  }
+
+  function restoreProject() {
+    if (!state.canvas) return;
+    var raw = localStorage.getItem('arte-editavel-project');
+    if (!raw) return;
+    try {
+      var payload = JSON.parse(raw);
+      if (!payload.canvas) return;
+      state.canvas.setWidth(Number(payload.width) || 800);
+      state.canvas.setHeight(Number(payload.height) || 600);
+      state.canvas.loadFromJSON(payload.canvas, function () {
+        state.canvas.renderAll();
+        if ($('#project-name')) $('#project-name').value = payload.name || 'Projeto sem nome';
+        state.history = [];
+        state.historyIndex = -1;
+        saveHistory();
+        updateLayersPanel();
+        toast('Último projeto restaurado');
+      });
+    } catch (err) {
+      localStorage.removeItem('arte-editavel-project');
+    }
+  }
+
+  function resizeCanvas(value) {
+    if (!state.canvas || value === 'original') return;
+    var sizes = { '1080x1080': [1080, 1080], '1080x1920': [1080, 1920], '1920x1080': [1920, 1080], '1080x1350': [1080, 1350], a4: [1240, 1754] };
+    var size = sizes[value];
+    if (value === 'custom') {
+      var answer = window.prompt('Informe largura x altura, por exemplo 1200x800');
+      var match = answer && answer.match(/^\s*(\d+)\s*x\s*(\d+)\s*$/i);
+      if (match) size = [Number(match[1]), Number(match[2])];
+    }
+    if (!size || size[0] < 100 || size[1] < 100 || size[0] > 5000 || size[1] > 5000) {
+      toast('Informe um tamanho entre 100 e 5000 px');
+      return;
+    }
+    state.canvas.setDimensions({ width: size[0], height: size[1] });
+    state.canvas.renderAll();
+    saveHistory();
+    toast('Formato alterado para ' + size[0] + ' × ' + size[1]);
+  }
+
+  function runCommand() {
+    var input = $('#nl-command');
+    var command = input ? input.value.trim() : '';
+    if (!command || !state.canvas) return;
+    var textMatch = command.match(/^(?:texto|título|titulo)\s*:\s*(.+)$/i);
+    var bgMatch = command.match(/^fundo\s*:\s*(#[0-9a-f]{6})$/i);
+    var active = state.canvas.getActiveObject();
+    if (textMatch && active && ['i-text', 'text', 'textbox'].indexOf(active.type) >= 0) {
+      active.set({ text: textMatch[1], name: textMatch[1].slice(0, 32) });
+      state.canvas.renderAll();
+      saveHistory();
+      showProps(active);
+      updateLayersPanel();
+      input.value = '';
+      return;
+    }
+    if (bgMatch) {
+      state.canvas.setBackgroundColor(bgMatch[1], state.canvas.renderAll.bind(state.canvas));
+      saveHistory();
+      input.value = '';
+      return;
+    }
+    toast(textMatch ? 'Selecione um texto primeiro' : 'Use “texto: ...” ou “fundo: #RRGGBB”');
+  }
+
   function undo() {
     if (state.historyIndex <= 0 || !state.canvas) return;
     state.historyIndex--;
@@ -121,7 +219,14 @@
       var div = document.createElement('div');
       var active = state.canvas.getActiveObject() === obj;
       div.className = 'layer-item flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer hover:bg-gray-700' + (active ? ' active' : '');
-      div.innerHTML = '<span class="text-gray-500">=</span><span class="flex-1 truncate">' + (obj.name || obj.type) + '</span>';
+      var handle = document.createElement('span');
+      handle.className = 'text-gray-500';
+      handle.textContent = '=';
+      var label = document.createElement('span');
+      label.className = 'flex-1 truncate';
+      label.textContent = obj.name || obj.type;
+      div.appendChild(handle);
+      div.appendChild(label);
       div.onclick = function () {
         state.canvas.setActiveObject(obj);
         state.canvas.requestRenderAll();
@@ -226,9 +331,17 @@
       state.detectedElements.forEach(function (el) {
         var d = document.createElement('div');
         d.className = 'flex items-center gap-3 p-2.5 rounded-lg bg-gray-800/60 border border-gray-700';
-        d.innerHTML = '<div class="flex-1 min-w-0"><div class="text-sm font-medium truncate">' +
-          (el.label || el.type) + '</div><div class="text-xs text-gray-500 truncate">' +
-          (el.text || el.type) + '</div></div>';
+        var content = document.createElement('div');
+        content.className = 'flex-1 min-w-0';
+        var title = document.createElement('div');
+        title.className = 'text-sm font-medium truncate';
+        title.textContent = el.label || el.type;
+        var detail = document.createElement('div');
+        detail.className = 'text-xs text-gray-500 truncate';
+        detail.textContent = el.text || el.type;
+        content.appendChild(title);
+        content.appendChild(detail);
+        d.appendChild(content);
         box.appendChild(d);
       });
     }
@@ -263,7 +376,7 @@
       fabricImg.set({
         left: 0, top: 0,
         scaleX: scale, scaleY: scale,
-        selectable: true,
+        selectable: false,
         name: (state.cleanBackgroundUrl && state.cleanBackgroundUrl !== state.originalImageDataUrl) ? 'Fundo limpo' : 'Imagem (fundo)',
         layerType: 'background'
       });
@@ -360,11 +473,127 @@
   function exportPNG() {
     if (!state.canvas) return;
     var url = state.canvas.toDataURL({ format: 'png', multiplier: 2 });
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = (($('#project-name') && $('#project-name').value) || 'arte') + '.png';
-    a.click();
+    download(url, projectName('png'));
     toast('PNG exportado');
+  }
+
+  function exportRaster(format) {
+    if (!state.canvas) return;
+    var mimeFormat = format === 'jpg' ? 'jpeg' : format;
+    var url = state.canvas.toDataURL({ format: mimeFormat, quality: 0.92, multiplier: 2 });
+    download(url, projectName(format));
+    toast(format.toUpperCase() + ' exportado');
+  }
+
+  function exportSVG() {
+    if (!state.canvas) return;
+    download(new Blob([state.canvas.toSVG()], { type: 'image/svg+xml' }), projectName('svg'));
+    toast('SVG exportado');
+  }
+
+  function exportJSON() {
+    if (!state.canvas) return;
+    var payload = JSON.stringify({
+      version: 1,
+      width: state.canvas.getWidth(),
+      height: state.canvas.getHeight(),
+      canvas: state.canvas.toJSON(['name', 'layerType'])
+    }, null, 2);
+    download(new Blob([payload], { type: 'application/json' }), projectName('json'));
+    toast('Projeto JSON exportado');
+  }
+
+  async function exportLayers() {
+    if (!state.canvas || !window.JSZip) return;
+    var zip = new JSZip();
+    var objects = state.canvas.getObjects();
+    objects.forEach(function (obj, index) {
+      var original = obj.visible;
+      objects.forEach(function (item) { item.visible = item === obj; });
+      state.canvas.renderAll();
+      var data = state.canvas.toDataURL({ format: 'png', multiplier: 2 }).split(',')[1];
+      zip.file(String(index + 1).padStart(2, '0') + '-' + (obj.layerType || obj.type) + '.png', data, { base64: true });
+      obj.visible = original;
+    });
+    objects.forEach(function (obj) { obj.visible = true; });
+    state.canvas.renderAll();
+    zip.file('projeto.json', JSON.stringify(state.canvas.toJSON(['name', 'layerType']), null, 2));
+    download(await zip.generateAsync({ type: 'blob' }), projectName('zip'));
+    toast('Camadas exportadas em ZIP');
+  }
+
+  function addShape(kind) {
+    if (!state.canvas) return;
+    var obj = kind === 'circle'
+      ? new fabric.Circle({ radius: 50, fill: '#2563eb', left: 80, top: 80 })
+      : new fabric.Rect({ width: 160, height: 100, fill: '#2563eb', left: 80, top: 80, rx: 8, ry: 8 });
+    obj.set({ name: kind === 'circle' ? 'Círculo' : 'Retângulo', layerType: 'shape' });
+    state.canvas.add(obj).setActiveObject(obj);
+    state.canvas.requestRenderAll();
+    saveHistory();
+    updateLayersPanel();
+  }
+
+  function chooseImage() {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp';
+    input.onchange = function () {
+      var file = input.files && input.files[0];
+      if (!file || !state.canvas) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        fabric.Image.fromURL(reader.result, function (img) {
+          var scale = Math.min(300 / img.width, 300 / img.height, 1);
+          img.set({ left: 50, top: 50, scaleX: scale, scaleY: scale, name: file.name, layerType: 'image' });
+          state.canvas.add(img).setActiveObject(img);
+          state.canvas.requestRenderAll();
+          saveHistory();
+          updateLayersPanel();
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  function changeBackground() {
+    if (!state.canvas) return;
+    var input = document.createElement('input');
+    input.type = 'color';
+    input.value = typeof state.canvas.backgroundColor === 'string' ? state.canvas.backgroundColor : '#111827';
+    input.oninput = function () { state.canvas.setBackgroundColor(input.value, state.canvas.renderAll.bind(state.canvas)); };
+    input.onchange = saveHistory;
+    input.click();
+  }
+
+  function toggleCompare() {
+    if (!state.canvas || !state.originalImageDataUrl) {
+      toast('Envie uma arte para comparar');
+      return;
+    }
+    if (state.compareOverlay) {
+      state.canvas.remove(state.compareOverlay);
+      state.compareOverlay = null;
+      state.canvas.renderAll();
+      toast('Edição exibida');
+      return;
+    }
+    fabric.Image.fromURL(state.originalImageDataUrl, function (img) {
+      img.set({
+        left: 0,
+        top: 0,
+        scaleX: state.canvas.getWidth() / img.width,
+        scaleY: state.canvas.getHeight() / img.height,
+        selectable: false,
+        evented: false,
+        excludeFromExport: true,
+        name: 'Comparação'
+      });
+      state.compareOverlay = img;
+      state.canvas.add(img).bringToFront(img).renderAll();
+      toast('Original exibido. Clique novamente para voltar.');
+    });
   }
 
   function bindProps() {
@@ -432,10 +661,35 @@
     }
 
     if ($('#btn-add-text')) $('#btn-add-text').addEventListener('click', addText);
+    if ($('#btn-add-image')) $('#btn-add-image').addEventListener('click', chooseImage);
+    if ($('#btn-bg-color')) $('#btn-bg-color').addEventListener('click', changeBackground);
+    if ($('#btn-save')) $('#btn-save').addEventListener('click', saveProject);
+    if ($('#btn-compare')) $('#btn-compare').addEventListener('click', toggleCompare);
+    if ($('#btn-refresh-layers')) $('#btn-refresh-layers').addEventListener('click', updateLayersPanel);
     if ($('#btn-delete')) $('#btn-delete').addEventListener('click', deleteSelected);
     if ($('#btn-duplicate')) $('#btn-duplicate').addEventListener('click', duplicateSelected);
     if ($('#btn-undo')) $('#btn-undo').addEventListener('click', undo);
     if ($('#btn-redo')) $('#btn-redo').addEventListener('click', redo);
+    if ($('#format-select')) $('#format-select').addEventListener('change', function (e) { resizeCanvas(e.target.value); });
+    if ($('#btn-run-command')) $('#btn-run-command').addEventListener('click', runCommand);
+    if ($('#nl-command')) $('#nl-command').addEventListener('keydown', function (e) { if (e.key === 'Enter') runCommand(); });
+    if ($('#prop-bold')) $('#prop-bold').addEventListener('click', function () {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('fontWeight', obj.fontWeight === 'bold' ? 'normal' : 'bold'); state.canvas.renderAll(); saveHistory(); }
+    });
+    if ($('#prop-italic')) $('#prop-italic').addEventListener('click', function () {
+      var obj = state.canvas && state.canvas.getActiveObject();
+      if (obj) { obj.set('fontStyle', obj.fontStyle === 'italic' ? 'normal' : 'italic'); state.canvas.renderAll(); saveHistory(); }
+    });
+    $$('.tool-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        $$('.tool-btn').forEach(function (item) { item.classList.remove('active'); });
+        btn.classList.add('active');
+        if (btn.dataset.tool === 'text') addText();
+        if (btn.dataset.tool === 'rect' || btn.dataset.tool === 'circle') addShape(btn.dataset.tool);
+        if (btn.dataset.tool === 'image') chooseImage();
+      });
+    });
 
     var exportBtn = $('#btn-export');
     var exportMenu = $('#export-menu');
@@ -451,7 +705,11 @@
       btn.addEventListener('click', function () {
         if (exportMenu) exportMenu.classList.add('hidden');
         if (btn.dataset.format === 'png') exportPNG();
-        else toast('Em breve: ' + btn.dataset.format);
+        else if (btn.dataset.format === 'jpg' || btn.dataset.format === 'webp') exportRaster(btn.dataset.format);
+        else if (btn.dataset.format === 'svg') exportSVG();
+        else if (btn.dataset.format === 'json') exportJSON();
+        else if (btn.dataset.format === 'png-layers') exportLayers();
+        else toast('PPTX ainda não está disponível');
       });
     });
 
@@ -468,6 +726,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     initCanvas();
     bindEvents();
+    restoreProject();
     console.log('Arte Editavel pronto - capas + OCR');
   });
 })();
