@@ -399,13 +399,13 @@
         var y = (typeof bbox.y === 'number' ? bbox.y : (0.05 + i * 0.1)) * displayH;
         var w = (typeof bbox.w === 'number' ? bbox.w : 0.88) * displayW;
         var h = (typeof bbox.h === 'number' ? bbox.h : 0.09) * displayH;
-        var fontSize = Math.max(16, Math.min(56, h * 0.75));
-        var textW = Math.max(w, (el.text || '').length * fontSize * 0.52);
+        var fontSize = Math.max(12, Math.min(64, h * 0.72));
+        var boxWidth = Math.max(24, Math.min(displayW - x, w));
 
         var cover = new fabric.Rect({
           left: Math.max(0, x - 6),
           top: Math.max(0, y - 4),
-          width: textW + 12,
+          width: boxWidth + 12,
           height: h + 10,
           fill: '#0a0a0a',
           opacity: 0.95,
@@ -415,12 +415,15 @@
         });
         state.canvas.add(cover);
 
-        var text = new fabric.IText(el.text, {
+        var text = new fabric.Textbox(el.text, {
           left: x,
           top: y,
           fontSize: fontSize,
           fontFamily: el.fontGuess || (i === 0 ? 'Impact' : 'Arial Black'),
           fill: el.color || '#ffffff',
+          width: boxWidth,
+          splitByGrapheme: false,
+          lineHeight: 1.05,
           name: el.text.substring(0, 32),
           layerType: 'text',
           shadow: 'rgba(0,0,0,0.55) 1px 1px 3px',
@@ -609,7 +612,7 @@
     }
     bind('#prop-text-content', function (e) {
       var obj = state.canvas && state.canvas.getActiveObject();
-      if (obj && (obj.type === 'i-text' || obj.type === 'text')) {
+      if (obj && (obj.type === 'i-text' || obj.type === 'text' || obj.type === 'textbox')) {
         obj.set('text', e.target.value);
         obj.set('name', e.target.value.substring(0, 32));
         state.canvas.requestRenderAll();
