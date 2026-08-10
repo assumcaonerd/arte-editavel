@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root { --panel: #111827; --border: #1f2937; }
     body { background: #0b0f19; color: #e5e7eb; font-family: Inter, system-ui, sans-serif; }
@@ -61,7 +62,6 @@
         <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="svg">SVG</button>
         <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="png-layers">Camadas em ZIP</button>
         <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="json">Projeto JSON</button>
-        <button class="export-option w-full text-left px-3 py-2 text-xs" data-format="pptx">PPTX (experimental)</button>
       </div>
     </div>
   </header>
@@ -97,7 +97,7 @@
       </div>
       <div class="h-14 panel border-t flex items-center px-4 gap-3 shrink-0">
         <span class="text-xs text-gray-500 shrink-0">Comando:</span>
-        <input id="nl-command" type="text" placeholder='Ex: "Mude o título para Novo Título", "Deixe o fundo azul-escuro"' class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+        <input id="nl-command" type="text" placeholder='Ex: "texto: Novo título" ou "fundo: #1d4ed8"' class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
         <button id="btn-run-command" class="btn px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-sm">Executar</button>
       </div>
     </main>
@@ -196,7 +196,7 @@
         <div>
           <label class="block text-xs text-gray-400 mb-1.5">Provedor</label>
           <select id="settings-provider" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm">
-            <option value="simulated">Simulado (sem chave)</option>
+            <option value="local">Local, grátis (Tesseract)</option>
             <option value="gemini">Google Gemini</option>
             <option value="groq">Groq (grátis)</option>
             <option value="openai">OpenAI (GPT)</option>
@@ -225,6 +225,7 @@
   </div>
 
   <script src="ocrService.js"></script>
+  <script src="layerService.js"></script>
   <script src="app.js"></script>
   <script>
   // Config BYOK - sempre funciona (independente do app.js)
@@ -236,7 +237,7 @@
         var s = JSON.parse(localStorage.getItem('arte-editavel-ocr-settings') || '{}');
         var p = document.getElementById('settings-provider');
         var k = document.getElementById('settings-api-key');
-        if (p) p.value = s.provider || 'simulated';
+        if (p) p.value = s.provider || 'local';
         if (k) k.value = s.apiKey || '';
       } catch(e) {}
       modal.classList.remove('hidden');
@@ -246,18 +247,18 @@
       if (modal) modal.classList.add('hidden');
     }
     function saveSettings() {
-      var provider = (document.getElementById('settings-provider') || {}).value || 'simulated';
+      var provider = (document.getElementById('settings-provider') || {}).value || 'local';
       var apiKey = ((document.getElementById('settings-api-key') || {}).value || '').trim();
       localStorage.setItem('arte-editavel-ocr-settings', JSON.stringify({ provider: provider, apiKey: apiKey }));
       closeSettings();
-      var labels = { simulated: 'Simulado', gemini: 'Gemini', groq: 'Groq', openai: 'OpenAI', claude: 'Claude' };
+      var labels = { local: 'Local, grátis', gemini: 'Gemini', groq: 'Groq', openai: 'OpenAI', claude: 'Claude' };
       alert('Configuração salva: ' + (labels[provider] || provider));
     }
     function clearSettings() {
       localStorage.removeItem('arte-editavel-ocr-settings');
       var p = document.getElementById('settings-provider');
       var k = document.getElementById('settings-api-key');
-      if (p) p.value = 'simulated';
+      if (p) p.value = 'local';
       if (k) k.value = '';
       alert('Chave removida');
     }

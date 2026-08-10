@@ -1,0 +1,13 @@
+{
+  "name": "arte-editavel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Editor de artes em camadas no navegador",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node scripts/check.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
