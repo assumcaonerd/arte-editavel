@@ -10,6 +10,8 @@ npm start
 
 Não há dependências para instalar. É necessário Node.js 18 ou superior e conexão com a internet para carregar Fabric.js, Tailwind e o OCR local.
 
+O mesmo servidor encaminha localmente as requisições da Ideogram para evitar o bloqueio CORS do navegador. Não é necessário iniciar `proxy-ideogram.js` separadamente.
+
 ## Config
 - **OCR local** (grátis, sem chave): Tesseract em português e inglês
 - **Groq**, Gemini, OpenAI ou Claude: OCR opcional por visão
