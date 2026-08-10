@@ -58,40 +58,88 @@ async function analyzeImage(imageDataUrl) {
 
 async function callLocalOCR(imageDataUrl) {
   if (!window.Tesseract) throw new Error('OCR local não carregado. Verifique sua conexão e recarregue a página.');
-  var result = await window.Tesseract.recognize(imageDataUrl, 'por+eng');
-  var data = result.data || {};
-  var width = 1;
-  var height = 1;
-  if (data.words && data.words.length) {
-    data.words.forEach(function (word) {
-      if (word.bbox) {
-        width = Math.max(width, word.bbox.x1 || 0);
-        height = Math.max(height, word.bbox.y1 || 0);
-      }
-    });
+  var size = await getImageSize(imageDataUrl);
+  var worker = await window.Tesseract.createWorker('por+eng');
+  var result;
+  try {
+    result = await worker.recognize(imageDataUrl, {}, { tsv: true });
+  } finally {
+    await worker.terminate();
   }
-  var lines = (data.lines || []).filter(function (line) {
-    return line.text && line.text.trim().length > 1 && (line.confidence == null || line.confidence >= 25);
-  });
+  var data = result.data || {};
+  var lines = parseTsvLines(data.tsv || '', size.width, size.height);
   var elements = lines.map(function (line, i) {
-    var box = line.bbox || { x0: 0, y0: 0, x1: width, y1: Math.max(20, height * 0.08) };
     return {
       id: 'text-' + (i + 1),
       type: 'text',
       label: i === 0 ? 'Título' : 'Texto ' + (i + 1),
-      text: line.text.trim(),
+      text: line.text,
       bbox: {
-        x: box.x0 / width,
-        y: box.y0 / height,
-        w: Math.max(0.02, (box.x1 - box.x0) / width),
-        h: Math.max(0.02, (box.y1 - box.y0) / height)
+        x: line.left / size.width,
+        y: line.top / size.height,
+        w: Math.max(0.02, line.width / size.width),
+        h: Math.max(0.02, line.height / size.height)
       },
       confidence: line.confidence >= 75 ? 'high' : line.confidence >= 50 ? 'medium' : 'low',
       color: '#ffffff',
       fontGuess: i === 0 ? 'Impact' : 'Arial'
     };
   });
-  return { elements: elements, provider: 'OCR local', simulated: false, raw: data.text || '' };
+  return {
+    elements: elements,
+    provider: 'OCR local',
+    simulated: false,
+    raw: data.text || '',
+    warning: elements.length ? '' : 'Nenhum texto foi reconhecido. Tente uma imagem com maior resolução ou use um provedor de visão em Config.'
+  };
+}
+
+function getImageSize(dataUrl) {
+  return new Promise(function (resolve, reject) {
+    var image = new Image();
+    image.onload = function () { resolve({ width: image.naturalWidth || image.width, height: image.naturalHeight || image.height }); };
+    image.onerror = function () { reject(new Error('Não foi possível ler as dimensões da imagem.')); };
+    image.src = dataUrl;
+  });
+}
+
+function parseTsvLines(tsv, imageWidth, imageHeight) {
+  var rows = tsv.trim().split(/\r?\n/).slice(1);
+  var groups = {};
+  rows.forEach(function (row) {
+    var cols = row.split('\t');
+    if (cols.length < 12 || Number(cols[0]) !== 5) return;
+    var text = cols.slice(11).join('\t').trim();
+    var confidence = Number(cols[10]);
+    if (!text || confidence < 15) return;
+    var key = cols[1] + ':' + cols[2] + ':' + cols[3] + ':' + cols[4];
+    var left = Number(cols[6]);
+    var top = Number(cols[7]);
+    var width = Number(cols[8]);
+    var height = Number(cols[9]);
+    if (!groups[key]) {
+      groups[key] = { words: [], left: left, top: top, right: left + width, bottom: top + height, confidence: 0, count: 0 };
+    }
+    var group = groups[key];
+    group.words.push(text);
+    group.left = Math.min(group.left, left);
+    group.top = Math.min(group.top, top);
+    group.right = Math.max(group.right, left + width);
+    group.bottom = Math.max(group.bottom, top + height);
+    group.confidence += confidence;
+    group.count++;
+  });
+  return Object.keys(groups).map(function (key) {
+    var group = groups[key];
+    return {
+      text: group.words.join(' '),
+      left: Math.max(0, group.left),
+      top: Math.max(0, group.top),
+      width: Math.min(imageWidth, group.right) - Math.max(0, group.left),
+      height: Math.min(imageHeight, group.bottom) - Math.max(0, group.top),
+      confidence: group.confidence / group.count
+    };
+  }).filter(function (line) { return line.text.length > 1 && line.width > 0 && line.height > 0; });
 }
 
 async function callGroq(base64Data, mimeType, apiKey) {
