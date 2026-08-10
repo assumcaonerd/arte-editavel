@@ -40,7 +40,10 @@
     var form = new FormData();
     form.append('image', blob, 'art.png');
 
-    var res = await fetch('https://api.ideogram.ai/v1/ideogram-v3/layerize-text', {
+    var endpoint = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? '/api/ideogram/layerize'
+      : 'https://api.ideogram.ai/v1/ideogram-v3/layerize-text';
+    var res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Api-Key': apiKey },
       body: form
